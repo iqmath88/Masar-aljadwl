@@ -1,4 +1,4 @@
-const APP_VERSION='0.9.11.2';
+const APP_VERSION='0.9.12.0';
 const KEY='school-timetable-v01';
 const stageDefaults=[['الأول',1,'#587B9B'],['الثاني',2,'#6F8F72'],['الثالث',3,'#9A7B60'],['الرابع',4,'#7D7398'],['الخامس',5,'#A16F78'],['السادس',6,'#557F83']];
 const defaultDays=[['الأحد',7,true],['الاثنين',7,true],['الثلاثاء',6,true],['الأربعاء',7,true],['الخميس',5,true],['الجمعة',0,false],['السبت',0,false]];
@@ -352,18 +352,19 @@ function directGenerationDiagnostics(){
   if(need>limit)add('block',`تكليف غير قابل للتوزيع — ${sub.name} / ${t.name}`,`${stageName(sec.stageId)} ${sec.name}: مطلوب ${need} حصص والمتاح ${limit} بعد القيود اليومية والقيود الإلزامية.`, 'advanced',rules.filter(r=>r.target!=='section'&&(!r.teacherId||r.teacherId===t.id)&&(!r.subjectId||r.subjectId===sub.id)).map(r=>r.id));
  }
  for(const t of db.teachers){const need=db.assignments.filter(a=>a.teacherId===t.id).reduce((n,a)=>n+(+a.weeklyPeriods||0),0);if(!need)continue;const tr=db.teacherRules?.[t.id]||{};let cap=0;for(const d of active){let n=0;for(let p=1;p<=d.periods;p++)if(!(tr.unavailable?.[d.id]||[]).includes(p))n++;cap+=Math.min(n,Math.max(1,+tr.maxDaily||99))}if(need>cap)add('block',`نصاب المدرس يتجاوز التوفر — ${t.name}`,`مطلوب ${need} حصة، والمتاح ${cap} فقط وفق قيود المدرس.`,'constraints')}
- if(!issues.length)add('info','لا يوجد تعارض مباشر مثبت','لم تكشف الفحوص الحسابية سبباً حاسماً. قد يكون هناك تعارض مركب أو انتهاء مهلة البحث؛ هذه النتيجة لا تضمن إمكانية التوليد.','generator');
+ for(const t of db.teachers){const need=db.assignments.filter(a=>a.teacherId===t.id).reduce((n,a)=>n+(+a.weeklyPeriods||0),0);if(!need)continue;const tr=db.teacherRules?.[t.id]||{};let cap=0;for(const day of active){const maxP=Math.max(0,...db.sections.map(sec=>sectionDayPeriods(sec,day)));let free=0;for(let p=1;p<=maxP;p++)if(!(tr.unavailable?.[day.id]||[]).includes(p))free++;cap+=Math.min(free,Math.max(1,+tr.maxDaily||99))}if(cap&&need<=cap&&need/cap>=0.85)add('warn','نصاب مرتفع جداً — '+t.name,'المطلوب '+need+' حصة من '+cap+' خانة متاحة ('+Math.round(need/cap*100)+'%). كلما اقترب من 100% صعب إيجاد جدول بلا تعارض؛ خفّف عدم الإتاحة أو وزّع جزءاً من تكليفاته.','teachers')}
+ if(!issues.some(x=>x.level==='block'||x.level==='limitation')&&!issues.some(x=>x.level==='warn'))add('info','لا يوجد تعارض مباشر مثبت','لم تكشف الفحوص الحسابية سبباً حاسماً. قد يكون هناك تعارض مركب أو انتهاء مهلة البحث؛ هذه النتيجة لا تضمن إمكانية التوليد.','generator');
  return issues;
 }
 function advancedDiagnosticMatch(r,a,sec,dayId,p){return (!r.dayId||r.dayId===dayId)&&(!r.stageId||r.stageId===sec.stageId)&&(!r.sectionId||r.sectionId===sec.id)&&(r.target!=='teacher'||r.teacherId===a.teacherId)&&(r.target!=='subject'||r.subjectId===a.subjectId)}
 function showDirectDiagnostics(){
  const issues=directGenerationDiagnostics();window.lastDirectDiagnosis={version:APP_VERSION,createdAt:new Date().toISOString(),issues,lastGeneration:window.generationReport||null};
  const target=$('#directDiagnosisResult');if(!target)return;
- target.innerHTML=`<div class="notice">تم فحص ${db.sections.length} شعبة و${db.assignments.length} تكليف و${(db.advancedRules||[]).length} قيد متقدم دون تعديل البيانات.</div>`+issues.map(x=>`<div class="issue ${x.level==='block'?'red':'orange'}"><div class="issue-icon">${x.level==='block'?'🔴':x.level==='limitation'?'🟠':'🔵'}</div><div style="flex:1"><b>${esc(x.title)}</b><div class="muted">${esc(x.detail)}</div>${x.ruleIds?.length?`<small>معرفات القيود: ${esc(x.ruleIds.join('، '))}</small><br>`:''}<button type="button" class="secondary direct-diagnostic-jump" data-target="${x.where}">فتح الإعداد المعني</button></div></div>`).join('');
+ const cnt=l=>issues.filter(x=>x.level===l).length;target.innerHTML=`<div class="diag-summary"><span class="d-block">🔴 ${cnt('block')} مانع</span><span class="d-lim">🟠 ${cnt('limitation')} حد وظيفي</span><span class="d-warn">🟡 ${cnt('warn')} تحذير</span></div><div class="notice">تم فحص ${db.sections.length} شعبة و${db.assignments.length} تكليف و${(db.advancedRules||[]).length} قيد متقدم دون تعديل البيانات.</div>`+issues.map(x=>`<div class="issue ${x.level==='block'?'red':'orange'}"><div class="issue-icon">${x.level==='block'?'🔴':x.level==='limitation'?'🟠':x.level==='warn'?'🟡':'🔵'}</div><div style="flex:1"><b>${esc(x.title)}</b><div class="muted">${esc(x.detail)}</div>${x.ruleIds?.length?`<small>معرفات القيود: ${esc(x.ruleIds.join('، '))}</small><br>`:''}<button type="button" class="secondary direct-diagnostic-jump" data-target="${x.where}">فتح الإعداد المعني</button></div></div>`).join('');
  document.querySelectorAll('.direct-diagnostic-jump').forEach(b=>b.onclick=()=>{page=b.dataset.target;render()});
 }
 function exportDirectDiagnostics(){if(!window.lastDirectDiagnosis)showDirectDiagnostics();const data=JSON.stringify(window.lastDirectDiagnosis,null,2),url=URL.createObjectURL(new Blob([data],{type:'application/json;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='masar-diagnosis.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-function diagnosticControls(){return `<section class="generation-report"><h3>تشخيص مباشر لسبب فشل التوليد</h3><p class="muted">يفحص القيود والتكليفات والسعة ويكشف تعارض نمط الحصص 4–6 مع محرك الدوام المتصل. لا يغير الجدول المحفوظ.</p><div class="actions"><button type="button" id="directDiagnosisBtn">تشخيص الآن</button><button type="button" class="secondary" id="directDiagnosisExport">تنزيل تقرير التشخيص JSON</button></div><div id="directDiagnosisResult"></div></section>`}
+function diagnosticControls(){return `<section class="generation-report"><h3>تشخيص أسباب عدم توليد الجدول</h3><p class="muted">يفحص القيود والتكليفات والسعة ويكشف تعارض نمط الحصص 4–6 مع محرك الدوام المتصل. لا يغير الجدول المحفوظ.</p><div class="actions"><button type="button" id="directDiagnosisBtn">تشخيص الآن</button><button type="button" class="secondary" id="directDiagnosisExport">تنزيل تقرير التشخيص JSON</button></div><div id="directDiagnosisResult"></div></section>`}
 function wireDirectDiagnostics(){if($('#directDiagnosisBtn'))$('#directDiagnosisBtn').onclick=showDirectDiagnostics;if($('#directDiagnosisExport'))$('#directDiagnosisExport').onclick=exportDirectDiagnostics}
 function generationDiagnostics(result){
  const found=[];const add=(severity,title,detail,where)=>found.push({severity,title,detail,where});
@@ -447,6 +448,7 @@ let generationWorker=null;
 let generationCancel=null;
 function startGeneration(){
  if(generationWorker)return;
+ {const pre=directGenerationDiagnostics().filter(x=>x.level==='block');if(pre.length){showDirectDiagnostics();$('#directDiagnosisResult')?.scrollIntoView?.({behavior:'smooth'});alert('لن يبدأ التوليد: وُجد '+pre.length+' سبب مانع مؤكد. راجع التشخيص أدناه وعالجها أولاً.');return}}
  const blockers=analyzeFeasibility().filter(x=>x.level==='red');
  if(blockers.length){alert('عالج الأخطاء المانعة أولاً');return;}
  if(db.timetable.length&&!confirm('سيبقى الجدول الحالي محفوظاً حتى ينجح إنشاء جدول جديد. متابعة؟'))return;
@@ -531,7 +533,7 @@ function generator(){
   ${diagnosticControls()}
   ${diagnosticHtml(window.generationReport)}
   ${timetableTable()}`;
-  wireDiagnostics();wireDirectDiagnostics();
+  wireDiagnostics();wireDirectDiagnostics();if(window.generationReport&&!window.generationReport.ok&&!window.generationReport.reused)showDirectDiagnostics();
   $('#checkBtn').onclick=()=>{page='feasibility';render()};
   if($('#generateBtn')){$('#generateBtn').disabled=!!generationWorker||!!reds;$('#generateBtn').onclick=startGeneration;}
   if(generationWorker&&$('#stopGenerate'))$('#stopGenerate').onclick=()=>generationCancel?.();
