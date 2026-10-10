@@ -1,4 +1,4 @@
-const APP_VERSION='0.9.12.0';
+const APP_VERSION='0.9.12.1';
 const KEY='school-timetable-v01';
 const stageDefaults=[['الأول',1,'#587B9B'],['الثاني',2,'#6F8F72'],['الثالث',3,'#9A7B60'],['الرابع',4,'#7D7398'],['الخامس',5,'#A16F78'],['السادس',6,'#557F83']];
 const defaultDays=[['الأحد',7,true],['الاثنين',7,true],['الثلاثاء',6,true],['الأربعاء',7,true],['الخميس',5,true],['الجمعة',0,false],['السبت',0,false]];
@@ -352,15 +352,78 @@ function directGenerationDiagnostics(){
   if(need>limit)add('block',`تكليف غير قابل للتوزيع — ${sub.name} / ${t.name}`,`${stageName(sec.stageId)} ${sec.name}: مطلوب ${need} حصص والمتاح ${limit} بعد القيود اليومية والقيود الإلزامية.`, 'advanced',rules.filter(r=>r.target!=='section'&&(!r.teacherId||r.teacherId===t.id)&&(!r.subjectId||r.subjectId===sub.id)).map(r=>r.id));
  }
  for(const t of db.teachers){const need=db.assignments.filter(a=>a.teacherId===t.id).reduce((n,a)=>n+(+a.weeklyPeriods||0),0);if(!need)continue;const tr=db.teacherRules?.[t.id]||{};let cap=0;for(const d of active){let n=0;for(let p=1;p<=d.periods;p++)if(!(tr.unavailable?.[d.id]||[]).includes(p))n++;cap+=Math.min(n,Math.max(1,+tr.maxDaily||99))}if(need>cap)add('block',`نصاب المدرس يتجاوز التوفر — ${t.name}`,`مطلوب ${need} حصة، والمتاح ${cap} فقط وفق قيود المدرس.`,'constraints')}
+ {const seen=new Set(issues.map(x=>x.title));deepDiagnosis().forEach(x=>{if(!seen.has(x.title)&&!(x.level==='block'&&x.title.startsWith('المدرس ')&&issues.some(y=>y.level==='block'&&y.title.includes('نصاب المدرس يتجاوز التوفر')&&y.title.includes(x.title.slice(8).split(':')[0]))))issues.push(x)})}
  for(const t of db.teachers){const need=db.assignments.filter(a=>a.teacherId===t.id).reduce((n,a)=>n+(+a.weeklyPeriods||0),0);if(!need)continue;const tr=db.teacherRules?.[t.id]||{};let cap=0;for(const day of active){const maxP=Math.max(0,...db.sections.map(sec=>sectionDayPeriods(sec,day)));let free=0;for(let p=1;p<=maxP;p++)if(!(tr.unavailable?.[day.id]||[]).includes(p))free++;cap+=Math.min(free,Math.max(1,+tr.maxDaily||99))}if(cap&&need<=cap&&need/cap>=0.85)add('warn','نصاب مرتفع جداً — '+t.name,'المطلوب '+need+' حصة من '+cap+' خانة متاحة ('+Math.round(need/cap*100)+'%). كلما اقترب من 100% صعب إيجاد جدول بلا تعارض؛ خفّف عدم الإتاحة أو وزّع جزءاً من تكليفاته.','teachers')}
  if(!issues.some(x=>x.level==='block'||x.level==='limitation')&&!issues.some(x=>x.level==='warn'))add('info','لا يوجد تعارض مباشر مثبت','لم تكشف الفحوص الحسابية سبباً حاسماً. قد يكون هناك تعارض مركب أو انتهاء مهلة البحث؛ هذه النتيجة لا تضمن إمكانية التوليد.','generator');
  return issues;
 }
 function advancedDiagnosticMatch(r,a,sec,dayId,p){return (!r.dayId||r.dayId===dayId)&&(!r.stageId||r.stageId===sec.stageId)&&(!r.sectionId||r.sectionId===sec.id)&&(r.target!=='teacher'||r.teacherId===a.teacherId)&&(r.target!=='subject'||r.subjectId===a.subjectId)}
+
+// ===== التحليل التفصيلي: تدفق أقصى (Max-Flow) يثبت استحالة التوزيع ويحدد المجموعة المسببة =====
+function slotAllowedFor(a,sec,day,p){
+ const t=db.teacherRules?.[a.teacherId]||{},sr=db.subjectRules?.[a.subjectId]||{},cap=sectionDayPeriods(sec,day);
+ if(p>cap)return false;
+ if((t.unavailable?.[day.id]||[]).includes(p))return false;
+ if(sr.strict!=='soft'){if(sr.noFirst&&p===1)return false;if(sr.noLast&&p===cap)return false}
+ return !(db.advancedRules||[]).some(r=>r.strict!=='soft'&&advancedDiagnosticMatch(r,a,sec,day.id,p)&&((r.mode==='allow'&&(p<r.from||p>r.to))||(r.mode==='block'&&p>=r.from&&p<=r.to)));
+}
+// items: [{need, slots:[slotIndex...]}]; slotDay: dayIndex per slot; dayCap: capacity per day. Returns flow and the starved set (Hall violator).
+function flowCheck(items,slotDay,dayCap){
+ const nI=items.length,nS=slotDay.length,nD=dayCap.length,S=0,T=1,I0=2,S0=2+nI,D0=2+nI+nS,N=D0+nD;
+ const g=Array.from({length:N},()=>[]),E=[];
+ const add=(u,v,c)=>{g[u].push(E.length);E.push({v,c});g[v].push(E.length);E.push({v:u,c:0})};
+ items.forEach((it,i)=>{add(S,I0+i,it.need);it.slots.forEach(k=>add(I0+i,S0+k,1))});
+ slotDay.forEach((d,k)=>add(S0+k,D0+d,1));dayCap.forEach((c,d)=>add(D0+d,T,c));
+ let flow=0;
+ for(;;){const lv=Array(N).fill(-1);lv[S]=0;const q=[S];for(let h=0;h<q.length;h++){const u=q[h];for(const id of g[u])if(E[id].c>0&&lv[E[id].v]<0){lv[E[id].v]=lv[u]+1;q.push(E[id].v)}}
+  if(lv[T]<0)break;const it=Array(N).fill(0);
+  const dfs=(u,f)=>{if(u===T)return f;for(;it[u]<g[u].length;it[u]++){const id=g[u][it[u]],e=E[id];if(e.c>0&&lv[e.v]===lv[u]+1){const r=dfs(e.v,Math.min(f,e.c));if(r>0){e.c-=r;E[id^1].c+=r;return r}}}return 0};
+  for(let f;(f=dfs(S,1e9))>0;)flow+=f}
+ const seen=Array(N).fill(false);seen[S]=true;const q=[S];for(let h=0;h<q.length;h++)for(const id of g[q[h]])if(E[id].c>0&&!seen[E[id].v]){seen[E[id].v]=true;q.push(E[id].v)}
+ const need=items.reduce((n,x)=>n+x.need,0);
+ return {flow,need,starved:items.map((_,i)=>i).filter(i=>seen[I0+i]&&items[i].need>0),slotsSeen:slotDay.filter((_,k)=>seen[S0+k]).length};
+}
+function deepDiagnosis(){
+ const out=[],active=db.days.filter(d=>d.active&&d.periods>0).sort((a,b)=>a.order-b.order);
+ const stageName=id=>db.stages.find(g=>g.id===id)?.name||'';
+ const lbl=a=>{const su=db.subjects.find(x=>x.id===a.subjectId),t=db.teachers.find(x=>x.id===a.teacherId);return (su?.name||'مادة')+' / '+(t?.name||'مدرس')};
+ const add=(level,title,detail,where,fix)=>out.push({level,title,detail,where,fix,ruleIds:[]});
+ // (1) كل شعبة: هل تتسع مواد الشعبة للخانات المسموحة لها؟ (ويكشف خانة لا يستطيع أي مدرس ملأها)
+ for(const sec of db.sections){
+  const as=db.assignments.filter(a=>a.sectionId===sec.id&&+a.weeklyPeriods>0);if(!as.length)continue;
+  const slots=[],slotDay=[];active.forEach((d,di)=>{for(let p=1;p<=sectionDayPeriods(sec,d);p++){slots.push({d,p});slotDay.push(di)}});
+  const items=as.map(a=>({need:+a.weeklyPeriods,slots:slots.map((s,k)=>slotAllowedFor(a,sec,s.d,s.p)?k:-1).filter(k=>k>=0)}));
+  const name=stageName(sec.stageId)+' '+sec.name;
+  items.forEach((it,i)=>{if(it.slots.length<it.need)add('block',`تكليف لا يجد خانات كافية — ${name}`,`${lbl(as[i])}: يحتاج ${it.need} حصة وله ${it.slots.length} خانة مسموحة فقط (بعد قيود المدرس والمادة والقيود المتقدمة).`,'constraints','أتح للمدرس أو للمادة خانات إضافية في هذه الشعبة، أو خفّف عدد الحصص.')});
+  const required=items.reduce((n,x)=>n+x.need,0);if(required>slots.length)continue;
+  const r=flowCheck(items,slotDay,active.map(()=>99));
+  if(r.flow<r.need){const bad=r.starved.map(i=>lbl(as[i])),sum=r.starved.reduce((n,i)=>n+items[i].need,0);
+   add('block',`الشعبة ${name} لا يمكن توزيعها رياضياً`,`المواد (${bad.join('، ')}) تحتاج معاً ${sum} حصة، لكن الخانات المسموحة لها مجتمعة ${r.slotsSeen} فقط. هذا تعارض مثبت لا يحله تغيير ترتيب البحث.`,'constraints','أتح خانات أكثر لمدرسي هذه المواد، أو أزل قيد «أول/آخر حصة» عن بعضها، أو انقل جزءاً من حصصها لمدرس آخر.')}
+  const dead=[];active.forEach(d=>{const f=slots.find(x=>x.d===d&&x.p>1&&!as.some(a=>slotAllowedFor(a,sec,x.d,x.p))&&slots.some(y=>y.d===d&&y.p>x.p));if(f)dead.push(d.name+' (من الحصة '+f.p+')')});
+  if(dead.length)add('warn',`خانات لا يملؤها أي مدرس — ${name}`,`في ${dead.join('، ')}: لا توجد مادة في هذه الشعبة يستطيع مدرسها الحضور. المحرك يملأ اليوم متصلاً من الحصة الأولى، فكل ما بعد هذه الخانة في ذلك اليوم سيتعطل.`,'constraints','أتح أحد مدرسي الشعبة في هذه الحصص، أو قلّل حصص تلك الأيام لهذه الشعبة.');;
+ }
+ // (2) كل مدرس: هل تتسع حصصه للخانات المتاحة مع حده اليومي؟
+ for(const t of db.teachers){
+  const as=db.assignments.filter(a=>a.teacherId===t.id&&+a.weeklyPeriods>0);if(!as.length)continue;
+  const tr=db.teacherRules?.[t.id]||{},mx=Math.max(1,+tr.maxDaily||99);
+  const slots=[],slotDay=[],map=new Map();
+  active.forEach((d,di)=>{const top=Math.max(0,...db.sections.map(sec=>sectionDayPeriods(sec,d)));for(let p=1;p<=top;p++){map.set(di+'|'+p,slots.length);slots.push({d,p});slotDay.push(di)}});
+  const items=as.map(a=>{const sec=db.sections.find(s=>s.id===a.sectionId);const ok=new Set();if(sec)slots.forEach((s,k)=>{if(slotAllowedFor(a,sec,s.d,s.p))ok.add(k)});return {need:+a.weeklyPeriods,slots:[...ok]}});
+  const r=flowCheck(items,slotDay,active.map(()=>mx));
+  if(r.flow<r.need){const bad=r.starved.map(i=>lbl(as[i]));
+   add('block',`المدرس ${t.name}: نصابه لا يتسع لأوقاته`,`يحتاج ${r.need} حصة، وأقصى ما يمكن وضعه حسب أوقات إتاحته وحده اليومي (${mx>50?'بلا حد':mx}) هو ${r.flow} حصة. المواد المتأثرة: ${bad.join('، ')}.`,'teachers','أتح له أياماً أو حصصاً إضافية، أو ارفع حده اليومي، أو انقل جزءاً من تكليفاته لمدرس آخر.')}
+ }
+ // (3) الأكثر تقييداً: أي تكليف تقترب خاناته المسموحة من حصصه
+ const tight=[];
+ for(const a of db.assignments.filter(a=>+a.weeklyPeriods>0)){const sec=db.sections.find(s=>s.id===a.sectionId);if(!sec)continue;let n=0;active.forEach(d=>{for(let p=1;p<=sectionDayPeriods(sec,d);p++)if(slotAllowedFor(a,sec,d,p))n++});
+  if(n>=+a.weeklyPeriods&&n<+a.weeklyPeriods*1.5)tight.push({a,sec,n,ratio:n/+a.weeklyPeriods})}
+ tight.sort((x,y)=>x.ratio-y.ratio).slice(0,5).forEach(x=>add('warn',`تكليف مقيّد جداً — ${stageName(x.sec.stageId)} ${x.sec.name}`,`${lbl(x.a)}: ${x.a.weeklyPeriods} حصة مقابل ${x.n} خانة مسموحة فقط. هذا النوع هو أكثر ما يُطيل البحث ويُفشل التوليد.`,'constraints','وسّع خانات المدرس أو المادة قليلاً ليصبح للمحرك هامش للمناورة.'));
+ return out;
+}
 function showDirectDiagnostics(){
  const issues=directGenerationDiagnostics();window.lastDirectDiagnosis={version:APP_VERSION,createdAt:new Date().toISOString(),issues,lastGeneration:window.generationReport||null};
  const target=$('#directDiagnosisResult');if(!target)return;
- const cnt=l=>issues.filter(x=>x.level===l).length;target.innerHTML=`<div class="diag-summary"><span class="d-block">🔴 ${cnt('block')} مانع</span><span class="d-lim">🟠 ${cnt('limitation')} حد وظيفي</span><span class="d-warn">🟡 ${cnt('warn')} تحذير</span></div><div class="notice">تم فحص ${db.sections.length} شعبة و${db.assignments.length} تكليف و${(db.advancedRules||[]).length} قيد متقدم دون تعديل البيانات.</div>`+issues.map(x=>`<div class="issue ${x.level==='block'?'red':'orange'}"><div class="issue-icon">${x.level==='block'?'🔴':x.level==='limitation'?'🟠':x.level==='warn'?'🟡':'🔵'}</div><div style="flex:1"><b>${esc(x.title)}</b><div class="muted">${esc(x.detail)}</div>${x.ruleIds?.length?`<small>معرفات القيود: ${esc(x.ruleIds.join('، '))}</small><br>`:''}<button type="button" class="secondary direct-diagnostic-jump" data-target="${x.where}">فتح الإعداد المعني</button></div></div>`).join('');
+ const cnt=l=>issues.filter(x=>x.level===l).length;target.innerHTML=`<div class="diag-summary"><span class="d-block">🔴 ${cnt('block')} مانع</span><span class="d-lim">🟠 ${cnt('limitation')} حد وظيفي</span><span class="d-warn">🟡 ${cnt('warn')} تحذير</span></div><div class="notice">تم فحص ${db.sections.length} شعبة و${db.assignments.length} تكليف و${(db.advancedRules||[]).length} قيد متقدم دون تعديل البيانات.</div>`+issues.map(x=>`<div class="issue ${x.level==='block'?'red':'orange'}"><div class="issue-icon">${x.level==='block'?'🔴':x.level==='limitation'?'🟠':x.level==='warn'?'🟡':'🔵'}</div><div style="flex:1"><b>${esc(x.title)}</b><div class="muted">${esc(x.detail)}</div>${x.ruleIds?.length?`<small>معرفات القيود: ${esc(x.ruleIds.join('، '))}</small><br>`:''}${x.fix?`<div class="diag-fix">💡 الحل المقترح: ${esc(x.fix)}</div>`:''}<button type="button" class="secondary direct-diagnostic-jump" data-target="${x.where}">فتح الإعداد المعني</button></div></div>`).join('');
  document.querySelectorAll('.direct-diagnostic-jump').forEach(b=>b.onclick=()=>{page=b.dataset.target;render()});
 }
 function exportDirectDiagnostics(){if(!window.lastDirectDiagnosis)showDirectDiagnostics();const data=JSON.stringify(window.lastDirectDiagnosis,null,2),url=URL.createObjectURL(new Blob([data],{type:'application/json;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='masar-diagnosis.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
@@ -508,10 +571,13 @@ function timetableTable(stageIds=null, groupedPrint=false){
   const tableWidth=50+columnWidths.reduce((a,b)=>a+b,0);
   const maxP=Math.max(...db.days.filter(d=>d.active).map(d=>d.periods));
   const shortPrintNames=printTeacherLabels();
-  let rows='';
+  let rows='',totalRows=0;
   db.days.filter(d=>d.active).sort((a,b)=>a.order-b.order).forEach(d=>{
-    for(let p=1;p<=d.periods;p++){
-      rows+=`<tr class="day-row day-${d.id}">${p===1?`<th scope="rowgroup" rowspan="${d.periods}" class="day-label day-${d.id}"><span class="vertical-day">${esc(d.name)}</span></th>`:''}<th class="period-number">${p}</th>`+secs.map(sec=>{
+    // In print, drop trailing periods that are empty for every section on this day (they only waste paper).
+    let eff=d.periods;if(groupedPrint){let last=0;for(let p=1;p<=d.periods;p++)if(secs.some(sec=>db.timetable.some(x=>x.sectionId===sec.id&&x.dayId===d.id&&x.period===p)))last=p;eff=Math.max(1,last)}
+    totalRows+=eff;
+    for(let p=1;p<=eff;p++){
+      rows+=`<tr class="day-row day-${d.id}">${p===1?`<th scope="rowgroup" rowspan="${eff}" class="day-label day-${d.id}"><span class="vertical-day">${esc(d.name)}</span></th>`:''}<th class="period-number">${p}</th>`+secs.map(sec=>{
         const e=db.timetable.find(x=>x.sectionId===sec.id&&x.dayId===d.id&&x.period===p);
         if(p>sectionDayPeriods(sec,d))return '<td class="tt-off">—</td>';if(!e)return '<td class="tt-empty">—</td>';
         const su=db.subjects.find(x=>x.id===e.subjectId),t=db.teachers.find(x=>x.id===e.teacherId);
@@ -519,7 +585,7 @@ function timetableTable(stageIds=null, groupedPrint=false){
       }).join('')+'</tr>';
     }
   });
-  return `<div class="tt-wrap"><table class="timetable compact-timetable" dir="rtl" style="--compact-width:${tableWidth}px"><colgroup><col class="day-col" ><col class="period-col" >${secs.map((_,i)=>`<col class="subject-col">`).join('')}</colgroup><thead>${groupedPrint?`<tr class="stage-groups"><th rowspan="2" class="vertical-heading"><span>اليوم</span></th><th rowspan="2" class="vertical-heading"><span>الحصة</span></th>${db.stages.slice().sort((a,b)=>a.order-b.order).filter(g=>secs.some(x=>x.stageId===g.id)).map(g=>`<th class="stage-group-title" colspan="${secs.filter(x=>x.stageId===g.id).length}">${esc(stageDisplayName(g))}</th>`).join('')}</tr><tr class="section-names">${secs.map(s=>`<th class="section-title">${esc(s.name)}</th>`).join('')}</tr>`:`<tr><th class="vertical-heading"><span>اليوم</span></th><th class="vertical-heading"><span>الحصة</span></th>${secs.map(s=>{let g=db.stages.find(x=>x.id===s.stageId);return `<th style="border-top:4px solid ${g?.color||'#888'}">${g?.name||''} ${esc(s.name)}</th>`}).join('')}</tr>`}</thead><tbody>${rows}</tbody></table></div>`;
+  const rowH=groupedPrint?Math.max(6.6,Math.min(7.2,Math.round(218/Math.max(1,totalRows)*10)/10)):6.6;return `<div class="tt-wrap"><table class="timetable compact-timetable" dir="rtl" style="--compact-width:${tableWidth}px;--row-h:${rowH}mm"><colgroup><col class="day-col" ><col class="period-col" >${secs.map((_,i)=>`<col class="subject-col">`).join('')}</colgroup><thead>${groupedPrint?`<tr class="stage-groups"><th rowspan="2" colspan="2" class="corner-cell">&nbsp;</th>${db.stages.slice().sort((a,b)=>a.order-b.order).filter(g=>secs.some(x=>x.stageId===g.id)).map(g=>`<th class="stage-group-title" colspan="${secs.filter(x=>x.stageId===g.id).length}">${esc(stageDisplayName(g))}</th>`).join('')}</tr><tr class="section-names">${secs.map(s=>`<th class="section-title">${esc(s.name)}</th>`).join('')}</tr>`:`<tr><th class="vertical-heading"><span>اليوم</span></th><th class="vertical-heading"><span>الحصة</span></th>${secs.map(s=>{let g=db.stages.find(x=>x.id===s.stageId);return `<th style="border-top:4px solid ${g?.color||'#888'}">${g?.name||''} ${esc(s.name)}</th>`}).join('')}</tr>`}</thead><tbody>${rows}</tbody></table></div>`;
 }
 function generator(){
   const issues=analyzeFeasibility(),reds=issues.filter(x=>x.level==='red').length;
@@ -747,8 +813,8 @@ html,body{margin:0!important;padding:0!important;background:white!important;colo
 .school-print-page table.compact-timetable thead tr.section-names th{background:#24466D!important}
 .school-print-page table.compact-timetable .vertical-heading{width:7mm!important;padding:0!important}
 .school-print-page table.compact-timetable .vertical-heading span{writing-mode:vertical-rl!important;transform:rotate(180deg)!important;display:inline-block!important;font-size:9px!important}
-.school-print-page table.compact-timetable tbody tr{height:6.6mm!important;break-inside:avoid!important;page-break-inside:avoid!important}
-.school-print-page table.compact-timetable tbody th,.school-print-page table.compact-timetable tbody td{height:6.6mm!important;padding:0 .12mm!important;line-height:1!important;font-size:8.3px!important}
+.school-print-page table.compact-timetable tbody tr{height:var(--row-h,6.6mm)!important;break-inside:avoid!important;page-break-inside:avoid!important}
+.school-print-page table.compact-timetable tbody th,.school-print-page table.compact-timetable tbody td{height:var(--row-h,6.6mm)!important;padding:0 .12mm!important;line-height:1!important;font-size:8.3px!important}
 .school-print-page table.compact-timetable .day-label{width:7mm!important;padding:0!important}
 .school-print-page table.compact-timetable .vertical-day{display:inline-block!important;writing-mode:vertical-rl!important;transform:rotate(180deg)!important;white-space:nowrap!important;font-size:11px!important;font-weight:900!important}
 .school-print-page table.compact-timetable .period-number{width:7mm!important;background:#e8eef5!important;font-size:9px!important;font-weight:900!important}
@@ -763,7 +829,11 @@ html,body{margin:0!important;padding:0!important;background:white!important;colo
 .school-print-page .print-reasons p{margin:.5mm 0!important}
 .school-print-page .print-signatures{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:4mm!important;text-align:center!important;margin-top:2mm!important}
 .school-print-page .print-signatures b{display:block!important;font-size:9px!important}
-.school-print-page .print-signatures span{display:block!important;font-size:7px!important;margin-top:1mm!important}
+.school-print-page .print-signatures span{display:block!important;font-size:8px!important;margin-top:1.5mm!important}
+.school-print-page .print-signatures b{font-size:10px!important}
+.school-print-page .print-signatures{margin-top:4mm!important}
+.school-print-page .print-reasons{min-height:13mm!important;border:.3mm solid #9fb3c8!important;border-radius:1.2mm!important;padding:1.4mm 2.4mm!important;margin-top:2mm!important}
+.school-print-page th.corner-cell{background:#102C50!important;border:.2mm solid #fff!important}
 .school-print-page.hide-teachers td.lesson small{display:none!important}
 .school-print-page.print-bw .formal-head{background:#e5e5e5!important;border-color:#555!important}
 .school-print-page.print-bw .formal-center h1,.school-print-page.print-bw .formal-center h2,.school-print-page.print-bw .formal-center h3,.school-print-page.print-bw .formal-side,.school-print-page.print-bw .formal-side small{color:#000!important}

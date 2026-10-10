@@ -35,3 +35,4 @@ table th{background:#E6F4F1;color:var(--accent-dark)}
 .diag-summary .d-block{color:#8F1D14;background:#FEECEA}.diag-summary .d-lim{color:#8A4B00;background:#FFF1DC}.diag-summary .d-warn{color:#7A5A00;background:#FFF8D6}
 .quality-grid>div{background:#E6F4F1;border-radius:12px}
 }
+@media screen{.diag-fix{margin:6px 0 8px;padding:7px 10px;border-radius:9px;background:#FFF8E6;color:#7A4B00;font-size:13px;border-inline-start:3px solid var(--amber)}}
