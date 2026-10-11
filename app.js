@@ -1,4 +1,4 @@
-const APP_VERSION='0.9.12.3';
+const APP_VERSION='0.9.12.4';
 const KEY='school-timetable-v01';
 const stageDefaults=[['الأول',1,'#587B9B'],['الثاني',2,'#6F8F72'],['الثالث',3,'#9A7B60'],['الرابع',4,'#7D7398'],['الخامس',5,'#A16F78'],['السادس',6,'#557F83']];
 const defaultDays=[['الأحد',7,true],['الاثنين',7,true],['الثلاثاء',6,true],['الأربعاء',7,true],['الخميس',5,true],['الجمعة',0,false],['السبت',0,false]];
@@ -473,7 +473,7 @@ function teacherLoadInfo(tid){const as=db.assignments.filter(a=>a.teacherId===ti
  const secs=as.map(a=>db.sections.find(s=>s.id===a.sectionId)).filter(Boolean);const per=[];let grid=0,open=0,cap=0,cap2=0;
  db.days.filter(d=>d.active&&d.periods>0).sort((a,b)=>a.order-b.order).forEach(d=>{const un=tr.unavailable?.[d.id]||[],top=secs.length?Math.max(...secs.map(s=>sectionDayPeriods(s,d))):d.periods;let g=0,f=0;for(let p=1;p<=d.periods;p++)if(!un.includes(p)){g++;if(p<=top)f++}grid+=g;open+=f;cap+=Math.min(f,mx);cap2+=Math.min(f,mx+1);per.push({day:d.name,grid:g,open:f})});
  return {as,need,mx,mn,grid,open,cap,cap2,per,pct:cap?Math.round(need/cap*100):(need?999:0)}}
-function teacherLoadText(i){const mxt=i.mx>50?'بلا حد':i.mx;return `الخانات المتاحة في الشبكة: ${i.grid}${i.open<i.grid?` (القابلة للاستخدام ضمن حصص شعبه: ${i.open})`:''} — ${i.per.map(x=>x.day+' '+x.open).join(' · ')}. بحدّه اليومي (${mxt})${i.mn?` وحدّه الأدنى (${i.mn}) الذي يُلزمه بالتدريس كل يوم`:''} يتسع فعلياً لـ ${i.cap} حصة، والمطلوب ${i.need} (${i.pct}%).`+(i.cap<i.open&&i.pct>=85?` رفع حدّه اليومي إلى ${i.mx+1} يرفع الاستيعاب إلى ${i.cap2} (${i.cap2?Math.round(i.need/i.cap2*100):0}%).`:'')}
+function teacherLoadText(i){const mxt=i.mx>50?'بلا حد':i.mx;return `الخانات المتاحة في الشبكة: ${i.grid}${i.open<i.grid?` (القابلة للاستخدام ضمن حصص شعبه: ${i.open})`:''} — ${i.per.map(x=>x.day+' '+x.open).join(' · ')}. بحدّه اليومي (${mxt})${i.mn?` وحدّه الأدنى (${i.mn}) الذي يُلزمه بالتدريس كل يوم`:''} يتسع فعلياً لـ ${i.cap} حصة، والمطلوب ${i.need} حصة، أي نسبة إشغال ${i.pct}% (${i.pct>100?'لا يتسع':i.pct>=85?'مرتفع'+(i.pct===100?' جداً — بلا أي مرونة':'')+' ويصعّب التوليد':i.pct>=70?'متوسط':'مريح'}؛ كلما انخفضت النسبة كان الجدول أسهل).`+(i.cap<i.open&&i.pct>=85?` رفع حدّه اليومي إلى ${i.mx+1} يرفع الاستيعاب إلى ${i.cap2} فتنخفض نسبة الإشغال إلى ${i.cap2?Math.round(i.need/i.cap2*100):0}%.`:'')}
 function teacherAssignmentsPanel(tid){const i=teacherLoadInfo(tid);
  const rows=i.as.map(a=>{const sec=db.sections.find(s=>s.id===a.sectionId),g=db.stages.find(x=>x.id===sec?.stageId);return `<tr><td>${esc(g?.name||'')} ${esc(sec?.name||'')}</td><td>${esc(db.subjects.find(s=>s.id===a.subjectId)?.name||'')}</td><td>${esc(a.weeklyPeriods)}</td></tr>`}).join('');
  const cls=i.need>i.cap?'error':i.pct>=85?'warning':'';
