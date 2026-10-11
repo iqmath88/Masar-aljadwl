@@ -1,5 +1,5 @@
 'use strict';
-self.onmessage=e=>{if(e.data.type!=='start')return;try{self.postMessage({type:'result',result:generate(e.data.db)})}catch(err){self.postMessage({type:'result',result:{ok:false,reason:'exception',message:String(err.stack||err)}})}};
+self.onmessage=e=>{if(e.data.type!=='start')return;try{self.postMessage({type:'result',result:generate(e.data.db,e.data.deadlineMs)})}catch(err){self.postMessage({type:'result',result:{ok:false,reason:'exception',message:String(err.stack||err)}})}};
 
 function advancedMatch(r,a,sec,dayId,p){
  if(r.dayId&&r.dayId!==dayId)return false;
@@ -13,11 +13,11 @@ function advancedAllowed(db,a,sec,dayId,p){
  return !(db.advancedRules||[]).some(r=>r.strict!=='soft'&&advancedMatch(r,a,sec,dayId,p)&&(r.mode==='allow'?(p<r.from||p>r.to):(p>=r.from&&p<=r.to)));
 }
 
-function generate(db){
+function generate(db,limitMs){
  const seed=validateExistingSchedule(db);
  if(seed.ok){return {ok:true,entries:seed.entries,reused:true,nodes:0,bestDepth:seed.entries.length,total:seed.entries.length,message:'تم التحقق من الجدول المحفوظ: جميع الحصص والقيود الإلزامية صحيحة. احتفظ المحرك بالحل المثبت بدلاً من إعادة البحث غير الضرورية.'};}
  self.postMessage({type:'phase',phase:'فحص الجدول المحفوظ: '+seed.reason+'؛ بدء البحث عن حل جديد'});
- const began=Date.now(),deadline=began+180000;const days=db.days.filter(d=>d.active&&d.periods>0).sort((a,b)=>a.order-b.order),D=days.length;
+ const began=Date.now(),deadline=began+(+limitMs||180000);const days=db.days.filter(d=>d.active&&d.periods>0).sort((a,b)=>a.order-b.order),D=days.length;
  const sections=db.sections,teachers=db.teachers,assignments=db.assignments.filter(a=>+a.weeklyPeriods>0),A=assignments.length;
  const ti=new Map(teachers.map((x,i)=>[x.id,i])),si=new Map(sections.map((x,i)=>[x.id,i]));
  const at=assignments.map(a=>ti.get(a.teacherId)),as=assignments.map(a=>si.get(a.sectionId));
@@ -104,8 +104,10 @@ function generate(db){
  choices.sort((a,b)=>{const score=i=>{const r=tRules[at[i]],p=chosen.p,d=chosen.d;return (remaining[i]?1/remaining[i]:99)+(assDay[i][d]?12:0)-(teacherDay[at[i]][d]>0&&teacherDay[at[i]][d]<minDaily[at[i]]?6:0)+((r.avoid||[]).includes(p)?3:0)-((r.preferred||[]).includes(p)?1:0)+((db.advancedRules||[]).some(ar=>ar.strict==='soft'&&advancedMatch(ar,assignments[i],sections[as[i]],days[d].id,p)&&(ar.mode==='allow'?(p>=ar.from&&p<=ar.to):!(p>=ar.from&&p<=ar.to)))?1.5:0)};return score(a)-score(b)||((a*37+attempt*53)%101)-((b*37+attempt*53)%101)});
  for(const i of choices){put(i,chosen.d,chosen.p,fixed.has(chosen.s+'|'+chosen.d+'|'+chosen.p));if(dfs(left-1))return true;undo();if(stop)return false}return false}
  if(quota.some((row,s)=>row.some((v,d)=>v<fixedMax[s][d])))continue;
- if(dfs(total)){return {ok:true,entries:entries.map(({_i,_d,_p,...x})=>x),nodes,bestDepth:total,message:`تم توزيع ${total} حصة دون فراغات داخلية، مع تطبيق قيود المواد الإلزامية.`}}
- if(stop)break;
+ let pre=0,preBad=null;for(const [k,i] of fixed){const parts=k.split('|').map(Number),d=parts[1],p=parts[2];if(can(i,d,p,quota)){put(i,d,p,true);pre++}else{preBad={i,d,p};break}}
+if(preBad){while(entries.length)undo();return {ok:false,reason:'fixed-conflict',message:'لا يمكن تنفيذ حصة مثبتة مع بقية القيود.',fixedConflict:{assignmentId:assignments[preBad.i].id,dayId:days[preBad.d].id,period:preBad.p}}}
+if(dfs(total-pre)){return {ok:true,entries:entries.map(({_i,_d,_p,...x})=>x),nodes,bestDepth:total,message:`تم توزيع ${total} حصة دون فراغات داخلية، مع تطبيق قيود المواد الإلزامية.`}}
+ while(entries.length)undo();if(stop)break;
  // Ensure all search state was undone before trying a different daily distribution.
  while(entries.length)undo();
  }

@@ -36,3 +36,4 @@ table th{background:#E6F4F1;color:var(--accent-dark)}
 .quality-grid>div{background:#E6F4F1;border-radius:12px}
 }
 @media screen{.diag-fix{margin:6px 0 8px;padding:7px 10px;border-radius:9px;background:#FFF8E6;color:#7A4B00;font-size:13px;border-inline-start:3px solid var(--amber)}}
+@media screen{button:not(.danger):not(.secondary):not(.warn){background:var(--accent)}button:not(.danger):not(.secondary):not(.warn):hover{background:var(--accent-dark)}button.danger{color:#fff;background:var(--danger)}.probe-out .issue{margin:10px 0}}

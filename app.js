@@ -1,4 +1,4 @@
-const APP_VERSION='0.9.12.1';
+const APP_VERSION='0.9.12.2';
 const KEY='school-timetable-v01';
 const stageDefaults=[['الأول',1,'#587B9B'],['الثاني',2,'#6F8F72'],['الثالث',3,'#9A7B60'],['الرابع',4,'#7D7398'],['الخامس',5,'#A16F78'],['السادس',6,'#557F83']];
 const defaultDays=[['الأحد',7,true],['الاثنين',7,true],['الثلاثاء',6,true],['الأربعاء',7,true],['الخميس',5,true],['الجمعة',0,false],['السبت',0,false]];
@@ -420,6 +420,53 @@ function deepDiagnosis(){
  tight.sort((x,y)=>x.ratio-y.ratio).slice(0,5).forEach(x=>add('warn',`تكليف مقيّد جداً — ${stageName(x.sec.stageId)} ${x.sec.name}`,`${lbl(x.a)}: ${x.a.weeklyPeriods} حصة مقابل ${x.n} خانة مسموحة فقط. هذا النوع هو أكثر ما يُطيل البحث ويُفشل التوليد.`,'constraints','وسّع خانات المدرس أو المادة قليلاً ليصبح للمحرك هامش للمناورة.'));
  return out;
 }
+
+// ===== التشخيص الدقيق بالاختبار التجريبي: يعيد التوليد على نسخ مخففة لتحديد القيد المسبب بالضبط =====
+let probeAbort=false;const probeWorkers=new Set();
+function probeRun(c,ms){return new Promise(res=>{if(probeAbort)return res({ok:false,aborted:true});let w;try{w=new Worker('generator-worker.js?v='+APP_VERSION)}catch(e){return res({ok:false,error:true})}
+ probeWorkers.add(w);let to;const done=r=>{clearTimeout(to);probeWorkers.delete(w);try{w.terminate()}catch(e){}res(r)};to=setTimeout(()=>done({ok:false,timeout:true}),ms+10000);
+ w.onmessage=e=>{if(e.data.type==='result')done(e.data.result)};w.onerror=()=>done({ok:false,error:true});w.postMessage({type:'start',db:c,deadlineMs:ms})})}
+function probeClone(){const c=JSON.parse(JSON.stringify({...db,timetable:[],printSettings:{}}));return c}
+const tName=id=>db.teachers.find(t=>t.id===id)?.name||'مدرس';
+const dayName=id=>db.days.find(d=>d.id===id)?.name||id;
+function fixedLabel(id){const f=db.fixedLessons.find(x=>x.id===id),a=f&&db.assignments.find(x=>x.id===f.assignmentId);if(!a)return id;const sec=db.sections.find(s=>s.id===a.sectionId);return `${db.subjects.find(s=>s.id===a.subjectId)?.name||''} / ${tName(a.teacherId)} — ${db.stages.find(g=>g.id===sec?.stageId)?.name||''} ${sec?.name||''} — ${dayName(f.dayId)} حصة ${f.period}`}
+const teachersWith=fn=>db.teachers.filter(t=>db.assignments.some(a=>a.teacherId===t.id&&+a.weeklyPeriods>0)&&fn(db.teacherRules?.[t.id]||{})).map(t=>t.id);
+const PROBE_GROUPS=[
+ {id:'fixed',name:'الحصص المثبتة',items:()=>db.fixedLessons.map(f=>f.id),apply:(c,ids)=>{c.fixedLessons=c.fixedLessons.filter(f=>!ids.includes(f.id))},label:fixedLabel},
+ {id:'unavail',name:'أوقات عدم إتاحة المدرسين',items:()=>teachersWith(r=>Object.values(r.unavailable||{}).some(a=>a.length)),apply:(c,ids)=>ids.forEach(id=>{c.teacherRules[id].unavailable={}}),label:tName},
+ {id:'subject',name:'قيود المواد (أول/آخر حصة ومنع التكرار)',items:()=>Object.keys(db.subjectRules||{}).filter(id=>{const r=db.subjectRules[id];return r&&(r.noFirst||r.noLast||r.noRepeat)&&r.strict!=='soft'}),apply:(c,ids)=>ids.forEach(id=>{c.subjectRules[id]={}}),label:id=>db.subjects.find(s=>s.id===id)?.name||id},
+ {id:'daily',name:'الحدود اليومية للمدرسين',items:()=>teachersWith(r=>(+r.maxDaily||99)<7||(+r.minDaily||0)>0),apply:(c,ids)=>ids.forEach(id=>{c.teacherRules[id].maxDaily=99;c.teacherRules[id].minDaily=0}),label:tName},
+ {id:'adv',name:'القيود المتقدمة',items:()=>(db.advancedRules||[]).filter(r=>r.strict!=='soft').map(r=>r.id),apply:(c,ids)=>{c.advancedRules=c.advancedRules.filter(r=>!ids.includes(r.id))},label:id=>{const r=db.advancedRules.find(x=>x.id===id);return r?.name||r?.title||id}}];
+async function probeTry(g,ids,ms){const c=probeClone();g.apply(c,ids);return (await probeRun(c,ms)).ok===true}
+async function probeNarrow(g,items,ms,log){let cur=items;while(cur.length>1&&!probeAbort){log(`تضييق نطاق «${g.name}»: ${cur.length} عنصراً متبقياً...`);const h=Math.ceil(cur.length/2),A=cur.slice(0,h),B=cur.slice(h);const [ra,rb]=await Promise.all([probeTry(g,A,ms),probeTry(g,B,ms)]);if(ra)cur=A;else if(rb)cur=B;else break}return cur}
+async function probeRefineDays(ids,ms,log){const rel=new Map();ids.forEach(id=>rel.set(id,new Set(Object.keys(db.teacherRules[id].unavailable||{}).filter(d=>(db.teacherRules[id].unavailable[d]||[]).length))));
+ const build=()=>{const c=probeClone();rel.forEach((set,id)=>set.forEach(d=>{c.teacherRules[id].unavailable[d]=[]}));return c};
+ for(const [id,set] of rel)for(const d of [...set]){if(probeAbort)break;log(`فحص هل يلزم فتح ${dayName(d)} لـ ${tName(id)}...`);set.delete(d);if((await probeRun(build(),ms)).ok!==true)set.add(d)}
+ return rel}
+function probeIssueHtml(i){return `<div class="issue red"><div class="issue-icon">🔎</div><div><b>${esc(i.title)}</b><p>${esc(i.detail)}</p><div class="diag-fix">💡 الحل المقترح: ${esc(i.fix)}</div></div></div>`}
+async function runProbeDiagnosis(){
+ const box=$('#probeResult');if(!box)return;probeAbort=false;const ms=20000;
+ const log=t=>{const l=box.querySelector('.probe-log');if(l)l.textContent=t};
+ box.innerHTML='<div class="notice"><span class="probe-log">بدء الاختبار التجريبي...</span> <button type="button" class="danger" id="probeStop">إيقاف</button></div><div class="probe-out"></div>';
+ $('#probeStop').onclick=()=>{probeAbort=true;probeWorkers.forEach(w=>{try{w.terminate()}catch(e){}});log('أُوقف الاختبار.')};
+ const out=box.querySelector('.probe-out'),issues=[];
+ const groups=PROBE_GROUPS.map(g=>({g,items:g.items()})).filter(x=>x.items.length);
+ log('فحص كل مجموعة قيود بالتوازي (حتى 20 ثانية لكل فحص)...');
+ const [base,...res]=await Promise.all([probeRun(probeClone(),ms),...groups.map(async x=>({...x,ok:await probeTry(x.g,x.items,ms)}))]);
+ if(probeAbort)return;
+ if(base.ok){log('انتهى.');out.innerHTML='<div class="notice">نجح التوليد في الاختبار التجريبي بدون أي تعديل. أعد الضغط على «توليد الجدول» (البحث عشوائي جزئياً وقد ينجح في محاولة أخرى).</div>';return}
+ const solving=res.filter(x=>x.ok);
+ if(!solving.length){log('انتهى.');out.innerHTML='<div class="notice error">لم يُحلّ التوليد بتخفيف أي مجموعة قيود وحدها خلال '+ms/1000+' ثانية. التعارض متشابك بين أكثر من مجموعة، أو أن المشكلة صعبة الحل بالوقت المحدد. جرّب تخفيف مجموعتين معاً يدوياً، أو أعد التشخيص بعد تقليل القيود.</div>';return}
+ for(const x of solving){if(probeAbort)break;const set=await probeNarrow(x.g,x.items,ms,log);const names=set.map(id=>x.g.label(id));
+  let detail=`عند تخفيف «${x.g.name}» لـ: ${names.join('، ')} نجح التوليد في الاختبار، وبدونه يفشل. `+(set.length>1?'القيد مشترك بين هؤلاء مجتمعين؛ فتحه لأحدهم وحده لم يكفِ في الاختبار.':'');
+  let fix='خفّف هذا القيد أو غيّر موعده.',title=`السبب المرجّح: ${x.g.name}`;
+  if(x.g.id==='unavail'){const rel=await probeRefineDays(set,ms,log);const parts=[];rel.forEach((days,id)=>{if(days.size)parts.push(`${tName(id)}: ${[...days].map(dayName).join(' + ')}`)});
+   if(parts.length){detail=`أدق نتيجة: إغلاق هذه الأيام عند المدرسين هو الذي يمنع التوليد — ${parts.join(' ؛ ')}. عند فتحها (مع بقاء بقية قيودهم) نجح التوليد في الاختبار.`;fix='أتح هؤلاء المدرسين في الأيام المذكورة (ولو لبعض الحصص)، أو وزّع جزءاً من تكليفاتهم على مدرس آخر.'}}
+  if(x.g.id==='fixed')fix='غيّر موعد هذه الحصة المثبتة أو ألغِ تثبيتها، ثم ثبّتها من مساحة العمل بعد نجاح التوليد.';
+  if(x.g.id==='daily')fix='ارفع الحد الأقصى اليومي أو أزل الحد الأدنى لهؤلاء المدرسين.';
+  if(x.g.id==='subject')fix='اجعل قيد المادة تفضيلياً (غير إلزامي) أو ألغِ «أول/آخر حصة/منع التكرار» لهذه المادة.';
+  issues.push({title,detail,fix})}
+ log('انتهى.');out.innerHTML=issues.map(probeIssueHtml).join('')+'<p class="muted">نتيجة تجريبية: كل فحص محدود بـ '+ms/1000+' ثانية، فقد يكون تعارضاً أعمق خارج هذا النطاق.</p>'}
 function showDirectDiagnostics(){
  const issues=directGenerationDiagnostics();window.lastDirectDiagnosis={version:APP_VERSION,createdAt:new Date().toISOString(),issues,lastGeneration:window.generationReport||null};
  const target=$('#directDiagnosisResult');if(!target)return;
@@ -427,8 +474,8 @@ function showDirectDiagnostics(){
  document.querySelectorAll('.direct-diagnostic-jump').forEach(b=>b.onclick=()=>{page=b.dataset.target;render()});
 }
 function exportDirectDiagnostics(){if(!window.lastDirectDiagnosis)showDirectDiagnostics();const data=JSON.stringify(window.lastDirectDiagnosis,null,2),url=URL.createObjectURL(new Blob([data],{type:'application/json;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='masar-diagnosis.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-function diagnosticControls(){return `<section class="generation-report"><h3>تشخيص أسباب عدم توليد الجدول</h3><p class="muted">يفحص القيود والتكليفات والسعة ويكشف تعارض نمط الحصص 4–6 مع محرك الدوام المتصل. لا يغير الجدول المحفوظ.</p><div class="actions"><button type="button" id="directDiagnosisBtn">تشخيص الآن</button><button type="button" class="secondary" id="directDiagnosisExport">تنزيل تقرير التشخيص JSON</button></div><div id="directDiagnosisResult"></div></section>`}
-function wireDirectDiagnostics(){if($('#directDiagnosisBtn'))$('#directDiagnosisBtn').onclick=showDirectDiagnostics;if($('#directDiagnosisExport'))$('#directDiagnosisExport').onclick=exportDirectDiagnostics}
+function diagnosticControls(){return `<section class="generation-report"><h3>تشخيص أسباب عدم توليد الجدول</h3><p class="muted">يفحص القيود والتكليفات والسعة ويكشف تعارض نمط الحصص 4–6 مع محرك الدوام المتصل. لا يغير الجدول المحفوظ.</p><div class="actions"><button type="button" id="directDiagnosisBtn">تشخيص الآن</button><button type="button" class="secondary" id="directDiagnosisExport">تنزيل تقرير التشخيص JSON</button></div><div class="notice">إذا فشل التوليد بسبب «انتهاء الوقت» ولم يظهر مانع واضح أعلاه، اضغط التشخيص الدقيق: يعيد المحرك على نسخ مخففة ليحدد المدرس أو الحصة أو القيد المسبب بالضبط.</div><div class="actions"><button type="button" id="probeBtn">🔎 تشخيص دقيق بالاختبار التجريبي</button></div><div id="probeResult"></div><div id="directDiagnosisResult"></div></section>`}
+function wireDirectDiagnostics(){if($('#directDiagnosisBtn'))$('#directDiagnosisBtn').onclick=showDirectDiagnostics;if($('#probeBtn'))$('#probeBtn').onclick=runProbeDiagnosis;if($('#directDiagnosisExport'))$('#directDiagnosisExport').onclick=exportDirectDiagnostics}
 function generationDiagnostics(result){
  const found=[];const add=(severity,title,detail,where)=>found.push({severity,title,detail,where});
  const active=db.days.filter(d=>d.active&&d.periods>0).sort((a,b)=>a.order-b.order);
