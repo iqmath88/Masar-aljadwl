@@ -1,4 +1,4 @@
-const APP_VERSION='0.9.15.1';
+const APP_VERSION='0.9.16.0';
 const KEY='school-timetable-v01';
 const stageDefaults=[['الأول',1,'#587B9B'],['الثاني',2,'#6F8F72'],['الثالث',3,'#9A7B60'],['الرابع',4,'#7D7398'],['الخامس',5,'#A16F78'],['السادس',6,'#557F83']];
 const defaultDays=[['الأحد',7,true],['الاثنين',7,true],['الثلاثاء',6,true],['الأربعاء',7,true],['الخميس',5,true],['الجمعة',0,false],['السبت',0,false]];
@@ -23,18 +23,18 @@ function downloadRecovery(){
  a.href=URL.createObjectURL(blob);a.download='masar-recovery-'+(obj.savedAt||'').slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 
-const pages=[['school','1. المدرسة'],['days','2. الأيام والحصص'],['sections','3. المراحل والشعب'],['subjects','4. المواد'],['teachers','5. المدرسون'],['loads','6. حصص المراحل'],['assignments','7. إدارة التكليفات'],['audit','8. تدقيق التكليفات'],['matrix','مصفوفة الحصص'],['constraints','9. قيود المدرسين'],['advanced','10. القيود المتقدمة'],['fixed','11. الحصص المثبتة'],['feasibility','12. فحص الجدوى'],['generator','13. توليد الجدول'],['workspaceTT','14. مساحة عمل الجدول'],['gapDiagnosis','15. تشخيص الفراغات'],['printSetup','16. التصميم والطباعة']];
+const pages=[['school','لوحة التحكم'],['schoolSettings','إعدادات المدرسة'],['days','2. الأيام والحصص'],['sections','3. المراحل والشعب'],['subjects','4. المواد'],['teachers','5. المدرسون'],['loads','6. حصص المراحل'],['assignments','7. إدارة التكليفات'],['audit','8. تدقيق التكليفات'],['matrix','مصفوفة الحصص'],['constraints','9. قيود المدرسين'],['advanced','10. القيود المتقدمة'],['fixed','11. الحصص المثبتة'],['feasibility','12. فحص الجدوى'],['generator','13. توليد الجدول'],['workspaceTT','14. مساحة عمل الجدول'],['gapDiagnosis','15. تشخيص الفراغات'],['printSetup','16. التصميم والطباعة']];
 const navigationGroups=[
- ['الإعداد الأساسي',['school','days','sections','subjects','loads']],
+ ['الإعداد الأساسي',['school','schoolSettings','days','sections','subjects','loads']],
  ['المدرسون والتكليفات',['teachers','assignments','matrix','audit']],
  ['القيود',['constraints','advanced','fixed']],
  ['التوليد والتشخيص',['feasibility','generator','gapDiagnosis']],
  ['الجداول والطباعة',['workspaceTT','printSetup']]
 ];
-const glassIcons={school:'⌂',days:'◷',sections:'▦',subjects:'◈',loads:'▤',teachers:'♙',assignments:'⇄',matrix:'▦',audit:'✓',constraints:'⛭',advanced:'◇',fixed:'♧',feasibility:'◎',generator:'✦',gapDiagnosis:'⌕',workspaceTT:'▦',printSetup:'▧'};
+const glassIcons={school:'✧',schoolSettings:'⚙',days:'◷',sections:'▦',subjects:'◈',loads:'▤',teachers:'♙',assignments:'⇄',matrix:'▦',audit:'✓',constraints:'⛭',advanced:'◇',fixed:'♧',feasibility:'◎',generator:'✦',gapDiagnosis:'⌕',workspaceTT:'▦',printSetup:'▧'};
 function closeMobileMenu(){document.body.classList.remove('sidebar-open');const toggle=document.getElementById('menuToggle'),shade=document.getElementById('sidebarBackdrop');if(toggle)toggle.setAttribute('aria-expanded','false');if(shade)shade.hidden=true}
 function glassSidebar(){const side=document.getElementById('sideNavigation');if(!side)return;
-side.innerHTML=navigationGroups.map((group,i)=>`<div class="side-group"><div class="side-group-title">${group[0]}</div>${group[1].map(id=>{const item=pages.find(p=>p[0]===id);return `<button type="button" class="side-link ${page===id?'selected':''}" data-side-page="${id}" ${page===id?'aria-current="page"':''}><span class="glass-icon side-icon" aria-hidden="true">${glassIcons[id]||'◇'}</span><span>${item[1].replace(/^\d+\.\s*/, '')}</span>${page===id?'<span class="side-active-dot"></span>':''}</button>`}).join('')}</div>`).join('');
+side.innerHTML=navigationGroups.map((group,i)=>`<div class="side-group"><div class="side-group-title">${group[0]}</div>${group[1].map(id=>{const item=pages.find(p=>p[0]===id);return `<button type="button" title="${item[1].replace(/^\d+\.\s*/, '')}" aria-label="${item[1].replace(/^\d+\.\s*/, '')}" class="side-link ${page===id?'selected':''}" data-side-page="${id}" ${page===id?'aria-current="page"':''}><span class="glass-icon side-icon" aria-hidden="true">${glassIcons[id]||'◇'}</span><span>${item[1].replace(/^\d+\.\s*/, '')}</span>${page===id?'<span class="side-active-dot"></span>':''}</button>`}).join('')}</div>`).join('');
 side.querySelectorAll('[data-side-page]').forEach(btn=>btn.onclick=()=>{page=btn.dataset.sidePage;closeMobileMenu();render();window.scrollTo({top:0,behavior:'smooth'})});
 const toggle=document.getElementById('menuToggle'),shade=document.getElementById('sidebarBackdrop');if(toggle&&!toggle.dataset.bound){toggle.dataset.bound='1';toggle.onclick=()=>{const open=!document.body.classList.contains('sidebar-open');document.body.classList.toggle('sidebar-open',open);toggle.setAttribute('aria-expanded',String(open));if(shade)shade.hidden=!open}}if(shade&&!shade.dataset.bound){shade.dataset.bound='1';shade.onclick=closeMobileMenu}
 }
@@ -50,8 +50,54 @@ function nav(){
 
 function completeness(){let c=[!!db.school.name,db.days.some(d=>d.active&&d.periods>0),db.sections.length,db.subjects.length,db.teachers.length,db.assignments.length];return Math.round(c.filter(Boolean).length/c.length*100)}
 function renderSummary(){if(!$('#summary'))return;let configured=db.teachers.filter(t=>db.teacherRules[t.id]).length;$('#summary').innerHTML=`<div class="cards"><div class="stat">اكتمال البيانات<b>${completeness()}%</b></div><div class="stat">الشعب<b>${db.sections.length}</b></div><div class="stat">المواد<b>${db.subjects.length}</b></div><div class="stat">المدرسون<b>${db.teachers.length}</b></div><div class="stat">قيود مضبوطة<b>${configured}</b></div><div class="stat">حصص مثبتة<b>${db.fixedLessons.length}</b></div></div><div class="progress" style="margin-top:12px"><i style="width:${completeness()}%"></i></div>`}
-function render(){document.body.dataset.page=page;nav();renderSummary();({school,days,sections,subjects,teachers,loads,assignments,audit,matrix,constraints,advanced,fixed,feasibility,generator,workspaceTT,gapDiagnosis,printSetup}[page])()}
-function school(){$('#workspace').innerHTML=`<h2>إعداد المدرسة</h2><div class="grid"><div class="field"><label>اسم المدرسة</label><input id="schoolName" value="${esc(db.school.name)}"></div><div class="field"><label>العام الدراسي</label><input id="schoolYear" value="${esc(db.school.year)}"></div></div><div class="actions"><button id="saveSchool">حفظ الإعدادات</button><button class="secondary" id="importBtn">استيراد نسخة احتياطية</button><button class="secondary" id="recoveryBtn">تنزيل نسخة الاسترجاع المحلية</button><button class="danger" id="resetBtn">إعادة ضبط المشروع</button></div>`;$('#saveSchool').onclick=()=>{db.school.name=$('#schoolName').value.trim();db.school.year=$('#schoolYear').value.trim();save()};$('#importBtn').onclick=()=>$('#importFile').click();$('#recoveryBtn').onclick=downloadRecovery;$('#resetBtn').onclick=()=>{if(confirm('سيتم حذف جميع البيانات المحلية. هل أنت متأكد؟')){if(!preserveTimetable('إعادة ضبط المشروع'))return;db=seed();save();render()}}}
+function render(){nav();renderSummary();document.body.classList.toggle('dashboard-page',page==='school');({school,schoolSettings,days,sections,subjects,teachers,loads,assignments,audit,matrix,constraints,advanced,fixed,feasibility,generator,workspaceTT,gapDiagnosis,printSetup}[page])()}
+// Independent dashboard verification is ephemeral and tied to the exact input snapshot.
+let homeAudit=null;
+function homeAuditSignature(){return JSON.stringify([db.timetable,db.assignments,db.teacherRules,db.subjectRules,db.advancedRules,db.fixedLessons,db.days,db.stageDayPeriods]);}
+async function runHomeAudit(){
+ const btn=document.getElementById('homeAuditButton');
+ if(btn){btn.disabled=true;btn.textContent='جارٍ فحص سلامة الجدول…'}
+ const signature=homeAuditSignature();
+ const expected=db.assignments.reduce((n,a)=>n+Math.max(0,+a.weeklyPeriods||0),0);
+ const actual=db.timetable.length;
+ let result;
+ try{result=await validateLocalCandidate(structuredClone(db.timetable))}
+ catch(e){result={ok:false,reason:'تعذر تشغيل المدقق: '+String(e)}}
+ homeAudit={signature,passed:!!result.ok&&actual===expected,reason:result.reason||'',checkedAt:new Date().toLocaleString('ar-IQ'),expected,actual};
+ if(page==='school')school();
+}
+function school(){
+ const assigned=db.assignments.reduce((n,a)=>n+Math.max(0,+a.weeklyPeriods||0),0);
+ const placed=db.timetable.length;
+ const teacherCount=db.teachers.length, sectionCount=db.sections.length;
+ const missing=Math.max(0,assigned-placed),extra=Math.max(0,placed-assigned);
+ const state=placed===0?'لم يتم إنشاء جدول بعد':placed===assigned?'اكتمل العدد المطلوب — بانتظار التدقيق':'الجدول غير مكتمل';
+ const status=placed===0?'neutral':placed===assigned?'ready':'attention';
+ const teacherRules=Object.values(db.teacherRules||{}).filter(Boolean).length;
+ const auditCurrent=homeAudit&&homeAudit.signature===homeAuditSignature()?homeAudit:null;
+ const auditText=placed===0?'لا يوجد جدول للتدقيق':auditCurrent?(auditCurrent.passed?'اجتاز التدقيق المستقل':'لم يجتز التدقيق المستقل'):'لم يُفحص الجدول الحالي';
+ const auditClass=placed===0?'neutral':auditCurrent?(auditCurrent.passed?'pass':'fail'):'pending';
+ const auditDetail=auditCurrent?(auditCurrent.passed?'فحص بتاريخ '+auditCurrent.checkedAt:(auditCurrent.reason||'يوجد اختلاف أو مخالفة تستدعي المراجعة')):'اضغط على زر الفحص للحصول على نتيجة موثقة للجدول الحالي.';
+
+ const actions=[['feasibility','◎','فحص الجدوى','فحص القيود والسعة'],['generator','✦','توليد الجدول','تشغيل محرك الجدولة'],['workspaceTT','▦','مساحة عمل الجدول','التعديل والتبادل اليدوي'],['gapDiagnosis','⌕','التشخيص','فحص الفراغات والمشكلات'],['printSetup','▧','الطباعة والتصميم','تصدير الجداول'],['schoolSettings','⚙','إعدادات المدرسة','الاسم والنسخ الاحتياطية']];
+ $('#workspace').innerHTML=`<div class="home-dash">
+ <div class="home-hero glass-surface"><div class="home-hero-text"><div class="home-kicker">✦ مركز التحكم المدرسي</div><h2>${esc(db.school.name||'مرحباً بك في مسار')}</h2><p>العام الدراسي ${esc(db.school.year||'—')} · إدارة الجداول من مكان واحد</p><div class="home-status ${status}"><span class="home-status-dot"></span>${esc(state)}</div></div><div class="home-hero-symbol" aria-hidden="true">▦</div></div>
+ <div class="home-metrics" aria-label="مؤشرات الجدول">
+ <div class="home-metric glass-surface"><span>الحصص المطلوبة</span><strong>${assigned}</strong><small>وفق التكليفات</small></div>
+ <div class="home-metric glass-surface"><span>الحصص المجدولة</span><strong>${placed}</strong><small>من ${assigned}</small></div>
+ <div class="home-metric glass-surface"><span>الشعب</span><strong>${sectionCount}</strong><small>شعبة مسجلة</small></div>
+ <div class="home-metric glass-surface"><span>المدرسون</span><strong>${teacherCount}</strong><small>${teacherRules} قيود مدرسين مسجلة</small></div>
+ </div>
+ <div class="home-progress glass-surface"><div class="home-progress-head"><b>تغطية الحصص</b><span>${assigned?Math.min(100,Math.round(placed/assigned*100)):0}%</span></div><div class="home-track"><i style="width:${assigned?Math.min(100,placed/assigned*100):0}%"></i></div><p>${assigned===0?'أدخل تكليفات المدرسين أولاً.':missing?'متبقي '+missing+' حصة غير مجدولة.':extra?'هناك '+extra+' حصة إضافية مقارنة بالتكليفات.':'اكتمل عدد الحصص. يجب تشغيل المدقق المستقل للتأكد من سلامة القيود.'}</p></div>
+ <section class="home-audit glass-surface" aria-label="سلامة الجدول"><div class="home-audit-heading"><div><h3>سلامة الجدول <span class="home-audit-tag ${auditClass}">${esc(auditText)}</span></h3><p>${esc(auditDetail)}</p></div><button type="button" id="homeAuditButton" ${placed?'':'disabled'}>فحص سلامة الجدول</button></div><div class="home-audit-facts"><span>اكتمال التوزيع: <strong>${assigned?Math.round(100*placed/assigned):0}%</strong></span><span>نتيجة التدقيق: <strong>${auditCurrent?(auditCurrent.passed?'ناجح':'غير ناجح'):'غير متاحة'}</strong></span></div></section>
+ <div class="home-section-head"><div><h3>الوصول السريع</h3><p>اختر العملية المطلوبة للانتقال إلى أدواتها مباشرة</p></div></div>
+ <div class="home-actions">${actions.map(a=>`<button type="button" class="home-action glass-surface" data-home-page="${a[0]}"><span class="home-action-icon" aria-hidden="true">${a[1]}</span><span class="home-action-text"><strong>${a[2]}</strong><small>${a[3]}</small></span><span class="home-action-arrow" aria-hidden="true">←</span></button>`).join('')}</div>
+ <div class="home-note"><span aria-hidden="true">ⓘ</span><p><strong>معلومة مهمة:</strong> اكتمال عدد الحصص لا يعني اجتياز جميع القيود. افتح «مساحة عمل الجدول» ثم شغّل «تدقيق الجدول وتصدير الشهادة» للتحقق المستقل.</p></div>
+ </div>`;
+ const homeAuditButton=document.getElementById('homeAuditButton');if(homeAuditButton)homeAuditButton.onclick=runHomeAudit;
+ document.querySelectorAll('[data-home-page]').forEach(b=>b.onclick=()=>{page=b.dataset.homePage;render();window.scrollTo({top:0,behavior:'smooth'})});
+}
+function schoolSettings(){$('#workspace').innerHTML=`<h2>إعداد المدرسة</h2><div class="grid"><div class="field"><label>اسم المدرسة</label><input id="schoolName" value="${esc(db.school.name)}"></div><div class="field"><label>العام الدراسي</label><input id="schoolYear" value="${esc(db.school.year)}"></div></div><div class="actions"><button id="saveSchool">حفظ الإعدادات</button><button class="secondary" id="importBtn">استيراد نسخة احتياطية</button><button class="secondary" id="recoveryBtn">تنزيل نسخة الاسترجاع المحلية</button><button class="danger" id="resetBtn">إعادة ضبط المشروع</button></div>`;$('#saveSchool').onclick=()=>{db.school.name=$('#schoolName').value.trim();db.school.year=$('#schoolYear').value.trim();save()};$('#importBtn').onclick=()=>$('#importFile').click();$('#recoveryBtn').onclick=downloadRecovery;$('#resetBtn').onclick=()=>{if(confirm('سيتم حذف جميع البيانات المحلية. هل أنت متأكد؟')){if(!preserveTimetable('إعادة ضبط المشروع'))return;db=seed();save();render()}}}
 function sectionDayPeriods(sec,day){const x=db.stageDayPeriods?.[sec.stageId]?.[day.id];return day.active?Math.max(0,Math.min(day.periods,Number.isFinite(+x)&&x!==undefined?+x:day.periods)):0}
 function dayCapacity(sec){return db.days.reduce((n,d)=>n+sectionDayPeriods(sec,d),0)}
 function days(){$('#workspace').innerHTML=`<h2>أيام الدوام وعدد الحصص</h2><div class="notice">يمكن أن يختلف عدد الحصص من يوم إلى آخر.</div><table><thead><tr><th>اليوم</th><th>دوام</th><th>عدد الحصص</th></tr></thead><tbody>${db.days.sort((a,b)=>a.order-b.order).map(d=>`<tr><td>${esc(d.name)}</td><td><input type="checkbox" data-active="${d.id}" ${d.active?'checked':''}></td><td><input type="number" min="0" max="12" data-periods="${d.id}" value="${d.periods}"></td></tr>`).join('')}</tbody></table><h3>تخصيص عدد الحصص حسب المرحلة واليوم</h3><div class="notice">العدد العام هو الحد الأعلى. مثال: الثلاثاء 7 حصص للمدرسة، و6 لبقية المراحل، و7 للسادس.</div><div class="tt-wrap"><table><thead><tr><th>المرحلة</th>${db.days.filter(d=>d.active).map(d=>`<th>${esc(d.name)}</th>`).join('')}</tr></thead><tbody>${db.stages.map(g=>`<tr><th>${esc(g.name)}</th>${db.days.filter(d=>d.active).map(d=>`<td><input class="stage-period-input" type="number" min="0" max="${d.periods}" data-stage-day="${g.id}|${d.id}" value="${db.stageDayPeriods[g.id]?.[d.id]??d.periods}"></td>`).join('')}</tr>`).join('')}</tbody></table></div>`;document.querySelectorAll('[data-stage-day]').forEach(x=>x.onchange=()=>{const [g,d]=x.dataset.stageDay.split('|');const max=db.days.find(v=>v.id===d).periods;if(!invalidateTimetable('تغيير حصص المرحلة')){days();return}db.stageDayPeriods[g]??={};db.stageDayPeriods[g][d]=Math.min(max,Math.max(0,+x.value||0));save();days()});document.querySelectorAll('[data-active]').forEach(x=>x.onchange=()=>{if(!invalidateTimetable('تغيير أيام الدوام')){days();return}db.days.find(d=>d.id===x.dataset.active).active=x.checked;save()});document.querySelectorAll('[data-periods]').forEach(x=>x.onchange=()=>{if(!invalidateTimetable('تغيير عدد الحصص')){days();return}let d=db.days.find(d=>d.id===x.dataset.periods);d.periods=Math.max(0,+x.value||0);d.active=d.periods>0;save();days()})}
@@ -191,11 +237,24 @@ function auditRows(){
 // Read-only Lumia-inspired section x subject assignment matrix; no changes to school data.
 function matrix(){
  const stages=[...db.stages].sort((a,b)=>a.order-b.order),secs=[...db.sections].sort((a,b)=>{const x=stages.findIndex(g=>g.id===a.stageId),y=stages.findIndex(g=>g.id===b.stageId);return x-y||(a.order||0)-(b.order||0)});
- const subs=db.subjects;const expected=db.assignments.reduce((n,a)=>n+Math.max(0,+a.weeklyPeriods||0),0);
- const cols=secs.map(sec=>{const as=db.assignments.filter(a=>a.sectionId===sec.id);return {sec,as,total:as.reduce((n,a)=>n+(+a.weeklyPeriods||0),0),capacity:dayCapacity(sec)}});
- const mismatch=cols.filter(c=>c.total>c.capacity).length;
- $('#workspace').innerHTML=`<div class="matrix-head"><div><h2>مصفوفة توزيع الحصص</h2><p class="muted">جميع الشعب والمواد في شاشة واحدة. الأرقام من التكليفات الفعلية؛ الخانات الفارغة تعني عدم وجود تكليف.</p></div><div class="actions"><button id="matrixAudit" class="secondary">تدقيق التكليفات</button><button id="matrixDiagnose">فحص الجدوى</button></div></div><div class="matrix-kpis"><div>الشعب <b>${secs.length}</b></div><div>المواد <b>${subs.length}</b></div><div>الحصص المكلفة <b>${expected}</b></div><div>تجاوز السعة <b>${mismatch}</b></div></div><div class="tt-wrap matrix-scroll"><table class="matrix-table"><thead><tr><th>المادة / الشعبة</th>${cols.map(c=>`<th style="border-top:4px solid ${esc(stages.find(g=>g.id===c.sec.stageId)?.color||'#496e87')}">${esc(stages.find(g=>g.id===c.sec.stageId)?.name||'')}<small>${esc(c.sec.name)}</small></th>`).join('')}</tr></thead><tbody>${subs.map(sub=>`<tr><th>${esc(sub.name)}</th>${cols.map(c=>{const a=c.as.filter(x=>x.subjectId===sub.id),n=a.reduce((v,x)=>v+(+x.weeklyPeriods||0),0),planned=loadFor(c.sec.stageId,sub.id),bad=planned>0&&n!==planned;return `<td class="${bad?'matrix-alert':n?'matrix-set':''}" title="المخطط ${planned} / المكلف ${n}">${n||'—'}${bad?'<span class="matrix-mark">!</span>':''}</td>`}).join('')}</tr>`).join('')}<tr class="matrix-total"><th>المجموع / السعة</th>${cols.map(c=>`<td class="${c.total>c.capacity?'matrix-alert':''}">${c.total} / ${c.capacity}</td>`).join('')}</tr></tbody></table></div><div class="notice">تنبيه: مطابقة العدد لا تثبت إمكان التوليد؛ القيود الزمنية وتعارضات المدرسين تحتاج فحص الجدوى والتوليد.</div>`;
+ const subs=db.subjects,expected=db.assignments.reduce((n,a)=>n+Math.max(0,+a.weeklyPeriods||0),0);
+ const savedSize=localStorage.getItem('masar-matrix-size')||'medium',size=['compact','medium','large'].includes(savedSize)?savedSize:'medium';
+ const selectedStage=localStorage.getItem('masar-matrix-stage')||'all',stage=selectedStage==='all'||stages.some(g=>g.id===selectedStage)?selectedStage:'all';
+ const selectedSection=localStorage.getItem('masar-matrix-section')||'all';
+ const stageSecs=secs.filter(x=>stage==='all'||x.stageId===stage),section=selectedSection==='all'||stageSecs.some(x=>x.id===selectedSection)?selectedSection:'all';
+ const visible=stageSecs.filter(x=>section==='all'||x.id===section);
+ const cols=visible.map(sec=>{const as=db.assignments.filter(a=>a.sectionId===sec.id);return {sec,as,total:as.reduce((n,a)=>n+(+a.weeklyPeriods||0),0),capacity:dayCapacity(sec)}});
+ const allCols=secs.map(sec=>({sec,total:db.assignments.filter(a=>a.sectionId===sec.id).reduce((n,a)=>n+(+a.weeklyPeriods||0),0),capacity:dayCapacity(sec)}));
+ const mismatch=allCols.filter(c=>c.total>c.capacity).length;
+ $('#workspace').innerHTML=`<div class="matrix-head"><div><h2>مصفوفة توزيع الحصص</h2><p class="muted">اختر المرحلة أو الشعبة، واضغط على أي خلية لمعرفة تفاصيل تكليفها.</p></div><div class="actions"><button id="matrixAudit" class="secondary">تدقيق التكليفات</button><button id="matrixDiagnose">فحص الجدوى</button></div></div>
+ <div class="matrix-controls"><label>المرحلة<select id="matrixStage"><option value="all">كل المراحل</option>${stages.map(g=>`<option value="${esc(g.id)}" ${stage===g.id?'selected':''}>${esc(g.name)}</option>`).join('')}</select></label><label>الشعبة<select id="matrixSection"><option value="all">كل الشعب</option>${stageSecs.map(x=>`<option value="${esc(x.id)}" ${section===x.id?'selected':''}>${esc(stages.find(g=>g.id===x.stageId)?.name||'')} — ${esc(x.name)}</option>`).join('')}</select></label><div class="matrix-size-control"><span>حجم الخلايا</span><div role="group" aria-label="حجم خلايا المصفوفة">${[['compact','مضغوط'],['medium','متوسط'],['large','كبير']].map(([id,label])=>`<button type="button" data-matrix-size="${id}" class="${size===id?'active':''}" aria-pressed="${size===id}">${label}</button>`).join('')}</div></div></div>
+ <div class="matrix-kpis"><div>الشعب المعروضة <b>${cols.length} / ${secs.length}</b></div><div>المواد <b>${subs.length}</b></div><div>الحصص المكلفة <b>${expected}</b></div><div>تجاوز السعة <b>${mismatch}</b></div></div>
+ <div class="tt-wrap matrix-scroll matrix-size-${size}" tabindex="0" aria-label="مصفوفة توزيع الحصص، مرر أفقياً لعرض باقي الشعب"><table class="matrix-table"><thead><tr><th>المادة / الشعبة</th>${cols.map(c=>`<th style="border-top:4px solid ${esc(stages.find(g=>g.id===c.sec.stageId)?.color||'#496e87')}">${esc(stages.find(g=>g.id===c.sec.stageId)?.name||'')}<small>${esc(c.sec.name)}</small></th>`).join('')}</tr></thead><tbody>${subs.map(sub=>`<tr><th>${esc(sub.name)}</th>${cols.map(c=>{const a=c.as.filter(x=>x.subjectId===sub.id),n=a.reduce((v,x)=>v+(+x.weeklyPeriods||0),0),planned=loadFor(c.sec.stageId,sub.id),bad=planned>0&&n!==planned;return `<td class="${bad?'matrix-alert':n?'matrix-set':''}"><button type="button" class="matrix-cell" data-sub="${esc(sub.id)}" data-sec="${esc(c.sec.id)}" aria-label="${esc(sub.name)}، ${esc(c.sec.name)}، المكلف ${n} والمخطط ${planned}">${n||'—'}${bad?'<span class="matrix-mark">!</span>':''}</button></td>`}).join('')}</tr>`).join('')}<tr class="matrix-total"><th>المجموع / السعة</th>${cols.map(c=>`<td class="${c.total>c.capacity?'matrix-alert':''}">${c.total} / ${c.capacity}</td>`).join('')}</tr></tbody></table></div><div id="matrixDetails" class="matrix-details" hidden aria-live="polite"></div><div class="notice">مطابقة أعداد الحصص لا تثبت إمكانية التوليد؛ يجب فحص قيود المدرسين وتدقيق الجدول النهائي.</div>`;
  $('#matrixAudit').onclick=()=>{page='audit';render()};$('#matrixDiagnose').onclick=()=>{page='feasibility';render()};
+ $('#matrixStage').onchange=e=>{localStorage.setItem('masar-matrix-stage',e.target.value);localStorage.setItem('masar-matrix-section','all');matrix()};
+ $('#matrixSection').onchange=e=>{localStorage.setItem('masar-matrix-section',e.target.value);matrix()};
+ document.querySelectorAll('[data-matrix-size]').forEach(btn=>btn.onclick=()=>{localStorage.setItem('masar-matrix-size',btn.dataset.matrixSize);const wrap=document.querySelector('.matrix-scroll');wrap.classList.remove('matrix-size-compact','matrix-size-medium','matrix-size-large');wrap.classList.add('matrix-size-'+btn.dataset.matrixSize);document.querySelectorAll('[data-matrix-size]').forEach(b=>{const on=b===btn;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on))})});
+ document.querySelectorAll('.matrix-cell').forEach(btn=>btn.onclick=()=>{const sub=db.subjects.find(x=>x.id===btn.dataset.sub),sec=db.sections.find(x=>x.id===btn.dataset.sec);if(!sub||!sec)return;const assignments=db.assignments.filter(a=>a.subjectId===sub.id&&a.sectionId===sec.id),planned=loadFor(sec.stageId,sub.id),actual=assignments.reduce((v,a)=>v+(+a.weeklyPeriods||0),0),details=$('#matrixDetails');details.hidden=false;details.innerHTML=`<div class="matrix-detail-head"><strong>${esc(sub.name)} — ${esc(stages.find(g=>g.id===sec.stageId)?.name||'')} / ${esc(sec.name)}</strong><button type="button" id="matrixCloseDetails" class="secondary">إغلاق ×</button></div><p>المخطط: <b>${planned}</b> | المكلف: <b>${actual}</b> | الفرق: <b>${actual-planned}</b></p>${assignments.length?`<ul>${assignments.map(a=>`<li>${esc(db.teachers.find(t=>t.id===a.teacherId)?.name||'مدرس غير معروف')} — ${+a.weeklyPeriods||0} حصة</li>`).join('')}</ul>`:'<p>لا توجد تكليفات لهذه المادة في هذه الشعبة.</p>'}<button type="button" id="matrixGoAssignments">فتح إدارة التكليفات</button>`;$('#matrixCloseDetails').onclick=()=>details.hidden=true;$('#matrixGoAssignments').onclick=()=>{page='assignments';render()};details.scrollIntoView({block:'nearest',behavior:'smooth'})});
 }
 function audit(){
  const all=auditRows(),stages=[...db.stages].sort((a,b)=>a.order-b.order);
@@ -586,23 +645,10 @@ function teacherAssignmentsPanel(tid){const i=teacherLoadInfo(tid);
  const rows=i.as.map(a=>{const sec=db.sections.find(s=>s.id===a.sectionId),g=db.stages.find(x=>x.id===sec?.stageId);return `<tr><td>${esc(g?.name||'')} ${esc(sec?.name||'')}</td><td>${esc(db.subjects.find(s=>s.id===a.subjectId)?.name||'')}</td><td>${esc(a.weeklyPeriods)}</td></tr>`}).join('');
  const cls=i.need>i.cap?'error':i.pct>=85?'warning':'';
  return `<h3>تكليفات المدرس</h3>${i.as.length?`<div style="overflow-x:auto"><table><thead><tr><th>الشعبة</th><th>المادة</th><th>الحصص أسبوعياً</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th colspan="2">المجموع</th><th>${i.need}</th></tr></tfoot></table></div>`:'<div class="notice">لا توجد تكليفات لهذا المدرس.</div>'}${i.as.length?`<div class="notice ${cls}">${esc(teacherLoadText(i))}</div>`:''}`}
-
-// ===== عرض التشخيص بلا تشتيت: دمج التحذيرات المتشابهة، وأهم 4 ملاحظات ظاهرة والباقي مطوي =====
-function diagIssueHTML(x){return `<div class="issue ${x.level==='block'?'red':'orange'}"><div class="issue-icon">${x.level==='block'?'🔴':x.level==='limitation'?'🟠':x.level==='warn'?'🟡':'🔵'}</div><div style="flex:1"><b>${esc(x.title)}</b><div class="muted">${esc(x.detail)}</div>${x.ruleIds?.length?`<small>معرفات القيود: ${esc(x.ruleIds.join('، '))}</small><br>`:''}${x.fix?`<div class="diag-fix">💡 الحل المقترح: ${esc(x.fix)}</div>`:''}<button type="button" class="secondary direct-diagnostic-jump" data-target="${x.where}">فتح الإعداد المعني</button></div></div>`}
-function diagIssuesHTML(list){
- const out=[],load=[],tight=[];
- list.forEach(x=>{if(x.level==='warn'&&x.title.startsWith('نصاب مرتفع جداً — '))load.push(x);else if(x.level==='warn'&&x.title.startsWith('تكليف مقيّد جداً — '))tight.push(x);else out.push(x)});
- if(load.length){const rows=load.map(x=>({n:x.title.replace('نصاب مرتفع جداً — ',''),p:+((x.detail.match(/نسبة إشغال (\d+)%/)||[])[1]||0)})).sort((a,b)=>b.p-a.p);
-  out.push({level:'warn',title:`مدرسون بنسبة إشغال مرتفعة (${load.length})`,detail:rows.slice(0,8).map(r=>`${r.n} ${r.p}%`).join(' · ')+(rows.length>8?` · و${rows.length-8} آخرون`:'')+'. كلما اقتربت النسبة من 100% صعب إيجاد جدول.',where:'constraints',fix:'ابدأ بالأعلى نسبة: ارفع حدّه اليومي أو أتح له خانات إضافية. افتح «قيود المدرسين» لرؤية تكليفاته ونسبته.'})}
- if(tight.length)out.push({level:'warn',title:`تكليفات مقيّدة جداً (${tight.length})`,detail:tight.map(x=>x.title.replace('تكليف مقيّد جداً — ','')+': '+x.detail.split('. ')[0]).join(' ؛ '),where:'constraints',fix:'وسّع خانات المدرس أو المادة قليلاً ليحصل المحرك على هامش للمناورة.'});
- const rank={block:0,limitation:1,warn:2,info:3};out.sort((a,b)=>(rank[a.level]??9)-(rank[b.level]??9));
- const head=out.slice(0,4).map(diagIssueHTML).join(''),rest=out.slice(4);
- return head+(rest.length?`<details class="diag-more"><summary>عرض ${rest.length} ملاحظات إضافية</summary>${rest.map(diagIssueHTML).join('')}</details>`:'');
-}
 function showDirectDiagnostics(){
  const issues=directGenerationDiagnostics();window.lastDirectDiagnosis={version:APP_VERSION,createdAt:new Date().toISOString(),issues,lastGeneration:window.generationReport||null};
  const target=$('#directDiagnosisResult');if(!target)return;
- const cnt=l=>issues.filter(x=>x.level===l).length;target.innerHTML=`<div class="diag-summary"><span class="d-block">🔴 ${cnt('block')} مانع</span><span class="d-lim">🟠 ${cnt('limitation')} حد وظيفي</span><span class="d-warn">🟡 ${cnt('warn')} تحذير</span></div><div class="notice">تم فحص ${db.sections.length} شعبة و${db.assignments.length} تكليف و${(db.advancedRules||[]).length} قيد متقدم دون تعديل البيانات.</div>`+diagIssuesHTML(issues);
+ const cnt=l=>issues.filter(x=>x.level===l).length;target.innerHTML=`<div class="diag-summary"><span class="d-block">🔴 ${cnt('block')} مانع</span><span class="d-lim">🟠 ${cnt('limitation')} حد وظيفي</span><span class="d-warn">🟡 ${cnt('warn')} تحذير</span></div><div class="notice">تم فحص ${db.sections.length} شعبة و${db.assignments.length} تكليف و${(db.advancedRules||[]).length} قيد متقدم دون تعديل البيانات.</div>`+issues.map(x=>`<div class="issue ${x.level==='block'?'red':'orange'}"><div class="issue-icon">${x.level==='block'?'🔴':x.level==='limitation'?'🟠':x.level==='warn'?'🟡':'🔵'}</div><div style="flex:1"><b>${esc(x.title)}</b><div class="muted">${esc(x.detail)}</div>${x.ruleIds?.length?`<small>معرفات القيود: ${esc(x.ruleIds.join('، '))}</small><br>`:''}${x.fix?`<div class="diag-fix">💡 الحل المقترح: ${esc(x.fix)}</div>`:''}<button type="button" class="secondary direct-diagnostic-jump" data-target="${x.where}">فتح الإعداد المعني</button></div></div>`).join('');
  document.querySelectorAll('.direct-diagnostic-jump').forEach(b=>b.onclick=()=>{page=b.dataset.target;render()});
 }
 function exportDirectDiagnostics(){if(!window.lastDirectDiagnosis)showDirectDiagnostics();const data=JSON.stringify(window.lastDirectDiagnosis,null,2),url=URL.createObjectURL(new Blob([data],{type:'application/json;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='masar-diagnosis.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
@@ -850,10 +896,10 @@ function generator(){
   const stateLabel=generationWorker?'جارٍ التوليد':reds?'توجد أخطاء مانعة':count===0?'لم يتم توليد جدول':complete?'جدول مكتمل عددياً — يحتاج تدقيقاً':'جدول غير مكتمل';
   $('#workspace').innerHTML=`<div class="gen-dashboard">
     <div class="gen-hero"><div><span class="gen-eyebrow">مركز التوليد والتشخيص</span><h2>إنشاء الجدول المدرسي</h2><p>ابدأ بالفحص، ثم التوليد، وراجع النتيجة قبل اعتمادها.</p></div><div class="gen-state ${reds?'is-blocked':complete?'is-complete':''}"><span class="gen-state-dot"></span>${stateLabel}</div></div>
+    <div class="gen-metrics"><div><strong>${count}<small> / ${expected}</small></strong><span>الحصص الموزعة</span></div><div><strong>${reds}</strong><span>أخطاء فحص الجدوى</span></div><div><strong>${warnings}</strong><span>تحذيرات التوزيع</span></div><div><strong>${db.sections.length}</strong><span>الشعب</span></div></div>
     <div class="gen-actions"><button id="generateBtn" ${reds?'disabled':''}>${db.timetable.length?'إعادة توليد الجدول':'توليد الجدول'}</button><button class="secondary" id="checkBtn">فحص الجدوى</button><button class="secondary" id="verifyTTBtn">تدقيق وتصدير الشهادة</button>${db.timetable.length?'<button class="danger" id="clearTT">مسح الجدول</button>':''}</div>
     <div id="generationProgress" class="gen-progress" aria-live="polite">${generationWorker?'التوليد جارٍ...':reds?'عالج الأخطاء المانعة قبل التوليد.':complete?'اكتمل عدد الحصص؛ استخدم التدقيق المستقل للتحقق من صحة الجدول.':'يمكنك فحص القيود ثم بدء التوليد.'}</div><button id="stopGenerate" class="danger" ${generationWorker?'':'hidden'}>إيقاف التوليد</button>
     ${window.generationReport?`<section class="gen-last-report"><b>آخر محاولة:</b> ${esc(window.generationReport.message||'لا توجد تفاصيل')} <small>السبب: ${esc(window.generationReport.reason||'—')} · الزمن: ${esc(window.generationReport.seconds||'—')} ثانية · أفضل عمق: ${window.generationReport.bestDepth||0} / ${window.generationReport.total||'—'}</small></section>`:''}
-    <div class="gen-metrics"><div><strong>${count}<small> / ${expected}</small></strong><span>الحصص الموزعة</span></div><div><strong>${reds}</strong><span>أخطاء فحص الجدوى</span></div><div><strong>${warnings}</strong><span>تحذيرات التوزيع</span></div><div><strong>${db.sections.length}</strong><span>الشعب</span></div></div>
     <div class="gen-section-title"><h3>التشخيص والحلول</h3><span>افتح التفاصيل عند الحاجة</span></div>
     <details class="gen-details" ${reds||window.generationReport&&!window.generationReport.ok?'open':''}><summary>فحص المشكلات والقيود المؤثرة <span>عرض التقرير والاختبارات</span></summary><div class="gen-details-body">${reds?`<div class="notice error">يوجد ${reds} خطأ مانع في فحص الجدوى.</div>`:''}${diagnosticControls()}${diagnosticHtml(window.generationReport)}</div></details>
     ${db.timetable.length?`<details class="gen-details"><summary>مؤشرات جودة التوزيع <span>مؤشرات إرشادية وليست شهادة صلاحية</span></summary><div class="gen-details-body"><div class="quality-grid"><div><b>${q.score}/100</b><span>مؤشر الجودة</span></div><div><b>${q.repeats}</b><span>تكرار يومي</span></div><div><b>${q.gaps}</b><span>فراغات المدرسين</span></div><div><b>${q.avoid}</b><span>حصص غير مفضلة</span></div></div><p class="muted">لا تعني درجة الجودة وجود مخالفات إلزامية؛ يعتمد التحقق على المدقق المستقل.</p></div></details>`:''}
@@ -942,6 +988,50 @@ function moveTimetableEntry(id){
  const close=()=>o.remove();o.querySelector('.icon-close').onclick=close;o.querySelector('#mvCancel').onclick=close;
  saveBtn.onclick=()=>{const changes=proposal();if(changes&&commitManual(changes,type.value==='swap'?'تبديل حصتين':'نقل حصة'))close()};
 }
+
+// Batch editor: all proposed moves are validated against the same final timetable.
+function batchManualEditor(){
+ if(!db.timetable.length)return alert('أنشئ الجدول أولاً.');
+ const o=document.createElement('div');o.className='edit-overlay batch-overlay';
+ const days=db.days.filter(d=>d.active).sort((a,b)=>a.order-b.order);
+ const teacherOpts=db.teachers.slice().sort((a,b)=>a.name.localeCompare(b.name,'ar')).map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');
+ o.innerHTML=`<div class="edit-card batch-card"><div class="edit-head"><h3>محرر التعديلات المتعددة</h3><button type="button" class="icon-close">×</button></div>
+ <p class="muted">اختر مدرساً وحصته، وأضف عدة حصص إلى قائمة التعديل. حدد موعداً جديداً لكل حصة، ثم افحص النتيجة النهائية قبل الحفظ. لا تتغير البيانات حتى تضغط «اعتماد جميع التعديلات».</p>
+ <div class="batch-pick"><div class="field"><label>المدرس</label><select id="batchTeacher">${teacherOpts}</select></div><div class="field"><label>الحصة الحالية</label><select id="batchEntry"></select></div><button type="button" id="batchAdd" class="secondary">إضافة الحصة</button></div>
+ <div id="batchRows" class="batch-rows"></div><div id="batchStatus" aria-live="polite"></div>
+ <div class="actions"><button id="batchCheck" type="button" class="secondary">فحص جميع التعديلات</button><button id="batchSave" type="button" disabled>اعتماد جميع التعديلات</button><button id="batchCancel" type="button" class="secondary">إلغاء</button></div></div>`;
+ document.body.appendChild(o);
+ const $b=q=>o.querySelector(q),picked=new Map(),teacher=$b('#batchTeacher'),entry=$b('#batchEntry'),rows=$b('#batchRows'),status=$b('#batchStatus'),saveBtn=$b('#batchSave');
+ const close=()=>o.remove();$b('.icon-close').onclick=close;$b('#batchCancel').onclick=close;
+ function entries(){const list=db.timetable.filter(e=>e.teacherId===teacher.value).sort((a,b)=>days.findIndex(d=>d.id===a.dayId)-days.findIndex(d=>d.id===b.dayId)||a.period-b.period);
+ entry.innerHTML=list.map(e=>`<option value="${esc(e.id)}">${esc(manualLabel(e))}</option>`).join('');$b('#batchAdd').disabled=!list.length}
+ teacher.onchange=entries;entries();
+ function invalidate(){saveBtn.disabled=true;status.textContent='عدّلت الخيارات؛ أعد الفحص قبل الاعتماد.'}
+ function proposal(){return [...picked.values()].map(x=>({id:x.id,dayId:x.dayId,period:+x.period}))}
+ function renderRows(){
+  rows.innerHTML=[...picked.values()].map((x,i)=>{const original=db.timetable.find(e=>e.id===x.id);
+   const d=db.days.find(y=>y.id===x.dayId),sec=db.sections.find(y=>y.id===original.sectionId);
+   const max=d?sectionDayPeriods(sec,d):0;
+   return `<div class="batch-row" data-batch-id="${esc(x.id)}"><div class="batch-row-title"><b>${i+1}. ${esc(manualLabel(original))}</b><button type="button" class="secondary batch-remove">إزالة</button></div><div class="batch-fields"><label>اليوم الجديد<select class="batch-day">${days.map(day=>`<option value="${esc(day.id)}" ${day.id===x.dayId?'selected':''}>${esc(day.name)}</option>`).join('')}</select></label><label>الحصة الجديدة<select class="batch-period">${Array.from({length:max},(_,j)=>`<option value="${j+1}" ${j+1===+x.period?'selected':''}>${j+1}</option>`).join('')}</select></label></div></div>`
+  }).join('')||'<div class="notice">لم تُضف أي حصة بعد.</div>';
+  rows.querySelectorAll('.batch-row').forEach(r=>{const x=picked.get(r.dataset.batchId),day=r.querySelector('.batch-day'),period=r.querySelector('.batch-period');
+   day.onchange=()=>{x.dayId=day.value;const d=db.days.find(y=>y.id===x.dayId),original=db.timetable.find(e=>e.id===x.id),sec=db.sections.find(y=>y.id===original.sectionId);x.period=Math.min(+x.period,sectionDayPeriods(sec,d));renderRows();invalidate()};
+   period.onchange=()=>{x.period=+period.value;invalidate()};
+   r.querySelector('.batch-remove').onclick=()=>{picked.delete(x.id);renderRows();invalidate()};
+  });
+ }
+ $b('#batchAdd').onclick=()=>{const e=db.timetable.find(x=>x.id===entry.value);if(!e)return;if(e.locked||db.fixedLessons.some(f=>f.assignmentId===e.assignmentId&&f.dayId===e.dayId&&f.period===e.period))return alert('هذه الحصة مثبتة ولا يمكن تعديلها.');
+ if(picked.has(e.id))return alert('الحصة موجودة بالفعل في القائمة.');
+ picked.set(e.id,{id:e.id,dayId:e.dayId,period:e.period});renderRows();invalidate()};
+ function check(){if(!picked.size){status.innerHTML='<div class="move-check red">أضف حصة واحدة على الأقل.</div>';saveBtn.disabled=true;return false}
+  const changes=proposal(),v=manualValidate(changes);
+  status.innerHTML=`<div class="move-check ${v.errors.length?'red':v.warnings.length?'orange':'green'}">${esc(v.errors.length?'⛔ '+v.errors.join('، '):v.warnings.length?'⚠️ '+v.warnings.join('، '):'✓ التعديلات متوافقة في الفحص الحالي')}</div>`;
+  saveBtn.disabled=!!v.errors.length;return !v.errors.length}
+ $b('#batchCheck').onclick=check;
+ saveBtn.onclick=()=>{if(!check())return;const changes=proposal();if(commitManual(changes,'تعديل متعدد ('+changes.length+' حصص)'))close()};
+ renderRows();
+}
+
 function toggleTimetableLock(id){
   const e=db.timetable.find(x=>x.id===id);if(!e)return;e.locked=!e.locked;
   const i=db.fixedLessons.findIndex(f=>f.assignmentId===e.assignmentId&&f.dayId===e.dayId&&f.period===e.period);
@@ -949,10 +1039,61 @@ function toggleTimetableLock(id){
   if(!e.locked&&i>=0)db.fixedLessons.splice(i,1);
   save();workspaceTT();
 }
+// ===== السحب والإفلات لتعديل الحصص يدوياً (جدول المدرس/الشعبة) — يعتمد على manualValidate نفسه =====
+function dndToast(msg,level,undo){let t=document.getElementById('ttToast');if(!t){t=document.createElement('div');t.id='ttToast';t.setAttribute('role','status');t.setAttribute('aria-live','polite');document.body.appendChild(t)}
+ t.className='tt-toast '+(level||'ok');t.innerHTML=`<span></span>${undo?'<button type="button" class="tt-toast-undo">تراجع</button>':''}`;t.firstChild.textContent=msg;t.hidden=false;
+ if(undo)t.querySelector('.tt-toast-undo').onclick=()=>{t.hidden=true;undoManual()};clearTimeout(t._h);t._h=setTimeout(()=>{t.hidden=true},undo?7000:4500)}
+function dndGapWarning(changes){const draft=db.timetable.map(e=>({...e,...(changes.find(c=>c.id===e.id)||{})}));const secs=new Set(),touched=new Set();changes.forEach(c=>{const e=db.timetable.find(x=>x.id===c.id);if(e){secs.add(e.sectionId);touched.add(e.sectionId+'|'+e.dayId);touched.add(e.sectionId+'|'+c.dayId)}});
+ for(const k of touched){const [sid,did]=k.split('|'),ps=draft.filter(x=>x.sectionId===sid&&x.dayId===did).map(x=>x.period).sort((a,b)=>a-b);if(ps.length&&ps.some((p,i)=>p!==i+1))return 'يترك فراغاً داخل يوم الشعبة'}return ''}
+function dndAdvanced(changes){const errors=[],warnings=[];for(const c of changes){const e0=db.timetable.find(x=>x.id===c.id),a=e0&&db.assignments.find(x=>x.id===e0.assignmentId),sec=e0&&db.sections.find(x=>x.id===e0.sectionId);if(!a||!sec)continue;
+  for(const r of db.advancedRules||[]){const hit=advancedDiagnosticMatch(r,a,sec,c.dayId,c.period)&&((r.mode==='allow'&&(c.period<r.from||c.period>r.to))||(r.mode==='block'&&c.period>=r.from&&c.period<=r.to));if(hit)(r.strict==='soft'?warnings:errors).push(r.strict==='soft'?'يخالف قيداً متقدماً تفضيلياً':'يخالف قيداً متقدماً إلزامياً')}}
+ return {errors:[...new Set(errors)],warnings:[...new Set(warnings)]}}
+function dndEvaluate(mode,viewId,e,dayId,period){
+ const inView=x=>(mode==='teacher'?x.teacherId===viewId:x.sectionId===viewId)&&x.dayId===dayId&&x.period===period;let target=db.timetable.find(inView);
+ if(target&&target.id===e.id)return null;
+ // في عرض المدرس: الخانة الفارغة عنده قد تكون مشغولة بحصة أخرى لشعبة الحصة؛ فالنقل إليها يعني تبديلها مع تلك الحصة
+ if(!target&&mode==='teacher')target=db.timetable.find(x=>x.id!==e.id&&x.sectionId===e.sectionId&&x.dayId===dayId&&x.period===period);
+ const changes=target?[{id:e.id,dayId,period},{id:target.id,dayId:e.dayId,period:e.period}]:[{id:e.id,dayId,period}],v=manualValidate(changes),adv=dndAdvanced(changes),gap=dndGapWarning(changes);
+ const errors=[...v.errors,...adv.errors],warnings=[...v.warnings,...adv.warnings,...(gap?[gap]:[])];
+ return {changes,type:target?'تبديل حصتين':'نقل حصة',errors,warnings,level:errors.length?'bad':warnings.length?'warn':'ok'}}
+function dndCommit(ev){const c=manualValidate(ev.changes),adv=dndAdvanced(ev.changes);if(c.errors.length||adv.errors.length){dndToast('⛔ '+[...c.errors,...adv.errors].join('، '),'bad');return false}
+ const before=ev.changes.map(x=>{const e=db.timetable.find(y=>y.id===x.id);return {id:e.id,dayId:e.dayId,period:e.period}});
+ ev.changes.forEach(x=>Object.assign(db.timetable.find(e=>e.id===x.id),x));db.manualHistory??=[];db.manualHistory.push({id:uid('edit'),at:new Date().toISOString(),type:ev.type,before,after:ev.changes.map(x=>({...x}))});if(db.manualHistory.length>100)db.manualHistory.shift();
+ save();workspaceTT();const w=[...c.warnings,...ev.warnings.filter(x=>!c.warnings.includes(x))];dndToast((w.length?'⚠️ ':'✓ ')+ev.type+(w.length?' — '+w.join('، '):''),w.length?'warn':'ok',true);return true}
+function lessonSheet(id){const e=db.timetable.find(x=>x.id===id);if(!e)return;const o=document.createElement('div');o.className='edit-overlay';
+ o.innerHTML=`<div class="edit-card"><div class="edit-head"><h3>خيارات الحصة</h3><button class="icon-close" type="button" aria-label="إغلاق">×</button></div><div class="notice">${esc(manualLabel(e))}</div><div class="notice">لنقل الحصة اسحبها إلى خانة أخرى (على الجوال: اضغط مطولاً ثم اسحب).</div><div class="actions"><button id="shLock">${e.locked?'🔓 فتح التثبيت':'🔒 تثبيت الحصة'}</button><button class="secondary" id="shMove">نقل/تبديل بالقوائم</button><button class="secondary" id="shClose">إغلاق</button></div></div>`;
+ document.body.appendChild(o);const close=()=>o.remove();o.querySelector('.icon-close').onclick=close;o.querySelector('#shClose').onclick=close;o.querySelector('#shLock').onclick=()=>{close();toggleTimetableLock(id)};o.querySelector('#shMove').onclick=()=>{close();moveTimetableEntry(id)}}
+function enableTimetableDnD(root){
+ const table=root.querySelector('table.focused');if(!table)return;const mode=table.dataset.mode,viewId=table.dataset.id;let st=null,hold=null;
+ const clear=()=>{table.querySelectorAll('.dnd-ok,.dnd-warn,.dnd-bad,.dnd-hover,.dnd-src').forEach(c=>c.classList.remove('dnd-ok','dnd-warn','dnd-bad','dnd-hover','dnd-src'));if(st?.ghost)st.ghost.remove();document.body.classList.remove('dnd-active')};
+ const slotOf=el=>{const td=el?.closest?.('td[data-slot]');return td&&table.contains(td)?td:null};
+ const begin=(td,e,x,y)=>{const ghost=document.createElement('div');ghost.className='dnd-ghost';ghost.textContent=td.querySelector('b')?.textContent||'حصة';document.body.appendChild(ghost);
+  st={td,e,ghost,map:new Map(),over:null,x,y};td.classList.add('dnd-src');document.body.classList.add('dnd-active');
+  table.querySelectorAll('td[data-slot]').forEach(c=>{const [d,p]=c.dataset.slot.split('|'),ev=dndEvaluate(mode,viewId,e,d,+p);if(!ev)return;st.map.set(c,ev);c.classList.add('dnd-'+ev.level)});move(x,y)};
+ const move=(x,y)=>{if(!st)return;st.x=x;st.y=y;st.ghost.style.left=x+'px';st.ghost.style.top=y+'px';const el=document.elementFromPoint?.(x,y),c=slotOf(el);
+  if(st.over&&st.over!==c)st.over.classList.remove('dnd-hover');st.over=c;if(c&&st.map.has(c)){c.classList.add('dnd-hover');const ev=st.map.get(c);dndToast((ev.level==='bad'?'⛔ '+ev.errors.join('، '):ev.level==='warn'?'⚠️ '+ev.warnings.join('، '):'✓ '+ev.type+' إلى هذه الخانة'),ev.level==='bad'?'bad':ev.level==='warn'?'warn':'ok')}
+  if(y<90)window.scrollBy(0,-14);else if(y>window.innerHeight-90)window.scrollBy(0,14)};
+ const end=(drop)=>{if(!st)return;const ev=drop&&st.over?st.map.get(st.over):null;clear();const was=st;st=null;window._dndJustDragged=Date.now();
+  if(ev){if(ev.level==='bad')dndToast('⛔ '+ev.errors.join('، '),'bad');else dndCommit(ev)}else{const t=document.getElementById('ttToast');if(t)t.hidden=true}};
+ table.querySelectorAll('td.lesson[data-entry]').forEach(td=>{
+  td.addEventListener('pointerdown',ev=>{if(ev.button>0)return;const e=db.timetable.find(x=>x.id===td.dataset.entry);if(!e)return;const x0=ev.clientX,y0=ev.clientY,touch=ev.pointerType&&ev.pointerType!=='mouse';
+   if(e.locked){hold=null;return}
+   const startDrag=()=>{try{td.setPointerCapture?.(ev.pointerId)}catch(_){}begin(td,e,x0,y0)};
+   if(!touch){hold={x0,y0,mouse:true,start:startDrag};return}
+   hold={x0,y0,timer:setTimeout(()=>{hold.timer=null;startDrag()},320),start:startDrag}});
+  td.addEventListener('pointermove',ev=>{if(st){ev.preventDefault();move(ev.clientX,ev.clientY);return}
+   if(hold){const dx=Math.abs(ev.clientX-hold.x0),dy=Math.abs(ev.clientY-hold.y0);if(hold.mouse){if(dx+dy>5){const h=hold;hold=null;h.start()}}else if(dx+dy>10){clearTimeout(hold.timer);hold=null}}});
+  const up=ev=>{if(hold?.timer)clearTimeout(hold.timer);hold=null;if(st){ev.preventDefault();end(ev.type==='pointerup')}};
+  td.addEventListener('pointerup',up);td.addEventListener('pointercancel',up);
+  td.addEventListener('click',ev=>{if(Date.now()-(window._dndJustDragged||0)<400)return;const e=db.timetable.find(x=>x.id===td.dataset.entry);if(!e)return;lessonSheet(e.id)});
+  td.addEventListener('contextmenu',ev=>{if(st||hold)ev.preventDefault()})});
+ document.addEventListener('touchmove',function tm(ev){if(!document.body.classList.contains('dnd-active')){if(!document.body.contains(table))document.removeEventListener('touchmove',tm);return}ev.preventDefault()},{passive:false});
+ document.addEventListener('keydown',function kd(ev){if(!document.body.contains(table)){document.removeEventListener('keydown',kd);return}if(ev.key==='Escape'&&st)end(false)})}
+
 function focusedTimetable(mode,id){
   const days=db.days.filter(d=>d.active).sort((a,b)=>a.order-b.order),max=Math.max(...days.map(d=>d.periods));let rows='';
-  for(let p=1;p<=max;p++)rows+=`<tr><th>الحصة ${p}</th>`+days.map(d=>{if(p>d.periods||(mode==='section'&&p>sectionDayPeriods(db.sections.find(s=>s.id===id),d)))return '<td class="tt-off">—</td>';const e=db.timetable.find(x=>(mode==='teacher'?x.teacherId===id:x.sectionId===id)&&x.dayId===d.id&&x.period===p);if(!e)return '<td class="tt-empty">—</td>';const l=ttEntryInfo(e);return `<td class="lesson interactive" data-entry="${e.id}" style="background:${l.color}"><b>${esc(l.subject)}</b><small>${esc(mode==='teacher'?l.section:l.teacher)}</small>${e.locked?'<span class="lock-mark">🔒</span>':''}</td>`}).join('')+'</tr>';
-  return `<div class="tt-wrap"><table class="timetable focused"><thead><tr><th>الحصة</th>${days.map(d=>`<th class="day-label day-${d.id}">${esc(d.name)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  for(let p=1;p<=max;p++)rows+=`<tr><th>الحصة ${p}</th>`+days.map(d=>{if(p>d.periods||(mode==='section'&&p>sectionDayPeriods(db.sections.find(s=>s.id===id),d)))return '<td class="tt-off">—</td>';const e=db.timetable.find(x=>(mode==='teacher'?x.teacherId===id:x.sectionId===id)&&x.dayId===d.id&&x.period===p);if(!e)return `<td class="tt-empty" data-slot="${d.id}|${p}">—</td>`;const l=ttEntryInfo(e);return `<td class="lesson interactive" data-entry="${e.id}" data-slot="${d.id}|${p}" style="background:${l.color}"><b>${esc(l.subject)}</b><small>${esc(mode==='teacher'?l.section:l.teacher)}</small>${e.locked?'<span class="lock-mark">🔒</span>':''}</td>`}).join('')+'</tr>';
+  return `<div class="tt-wrap"><table class="timetable focused" data-mode="${mode}" data-id="${esc(id)}"><thead><tr><th>الحصة</th>${days.map(d=>`<th class="day-label day-${d.id}">${esc(d.name)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function timetableIssueCounts(){
   let errors=0,warnings=0;db.timetable.forEach(e=>{const v=validateTimetableMove(e,e.dayId,e.period);if(v.level==='red')errors++;else if(v.level==='orange')warnings++});return {errors,warnings};
@@ -1002,16 +1143,16 @@ function daysForGaps(){return db.days.filter(d=>d.active).sort((a,b)=>a.order-b.
 function workspaceTT(){
  if(!db.timetable.length){$('#workspace').innerHTML='<h2>مساحة عمل الجدول</h2><div class="empty">أنشئ الجدول أولاً.</div>';return}
  const pref=window.ttPreferred||{mode:'school'},counts=timetableIssueCounts();
- $('#workspace').innerHTML=`<h2>مساحة عمل الجدول</h2><div class="workspace-toolbar"><div class="field"><label>نوع العرض</label><select id="ttMode"><option value="school">المدرسة كاملة</option><option value="teacher">جدول مدرس</option><option value="section">جدول شعبة</option></select></div><div class="field" id="ttEntityWrap"></div><button class="secondary" id="manualUndo">تراجع عن آخر تعديل</button><button class="secondary" id="manualLog">سجل التعديلات</button><button class="secondary" id="gapGo">تشخيص الفراغات</button><button class="problems-btn" id="ttProblems">${counts.errors} أخطاء — ${counts.warnings} تحذيرات</button><button class="secondary" id="ttPrint">طباعة العرض الحالي</button><button class="secondary" id="ttPrintAllTeachers">طباعة بطاقات جميع المدرسين</button><button class="secondary" id="ttPrintAllSections">طباعة بطاقات جميع الشعب</button></div><div class="notice">اختر المدرس أو الشعبة. اضغط على الحصة لنقلها أو تبديلها أو تثبيتها. الطباعة تتبع العرض المختار.</div><div id="ttWorkspaceView"></div>`;
+ $('#workspace').innerHTML=`<h2>مساحة عمل الجدول</h2><div class="workspace-toolbar"><div class="field"><label>نوع العرض</label><select id="ttMode"><option value="school">المدرسة كاملة</option><option value="teacher">جدول مدرس</option><option value="section">جدول شعبة</option></select></div><div class="field" id="ttEntityWrap"></div><button class="secondary" id="manualBatch">تعديل متعدد بين المدرسين</button><button class="secondary" id="manualUndo">تراجع عن آخر تعديل</button><button class="secondary" id="manualLog">سجل التعديلات</button><button class="secondary" id="gapGo">تشخيص الفراغات</button><button class="problems-btn" id="ttProblems">${counts.errors} أخطاء — ${counts.warnings} تحذيرات</button><button class="secondary" id="ttImage">حفظ العرض كصورة PNG</button><span id="ttImageStatus" class="muted" aria-live="polite"></span><button class="secondary" id="ttPrint">طباعة العرض الحالي</button><button class="secondary" id="ttPrintAllTeachers">طباعة بطاقات جميع المدرسين</button></div><div class="notice">اختر المدرس أو الشعبة. اسحب الحصة إلى خانة أخرى لنقلها (أو فوق حصة لتبديلهما) — على الجوال اضغط مطولاً ثم اسحب. اضغط الحصة لتثبيتها أو لخيارات أخرى. الطباعة تتبع العرض المختار.</div><div id="ttWorkspaceView"></div>`;
  const mode=$('#ttMode'),wrap=$('#ttEntityWrap'),view=$('#ttWorkspaceView');mode.value=pref.mode;
- function bindCells(){document.querySelectorAll('#ttWorkspaceView [data-entry]').forEach(td=>td.onclick=()=>{const e=db.timetable.find(x=>x.id===td.dataset.entry),l=ttEntryInfo(e);if(confirm(`${l.subject} — ${l.teacher}\nموافق = نقل الحصة\nإلغاء = خيارات القفل`))moveTimetableEntry(e.id);else if(confirm(e.locked?'فتح القفل؟':'تثبيت الحصة؟'))toggleTimetableLock(e.id)})}
+ function bindCells(){enableTimetableDnD(view)}
  function draw(){const m=mode.value;window.ttPreferred={mode:m};if(m==='school'){wrap.innerHTML='';view.innerHTML=timetableTable();return}
  const list=m==='teacher'?db.teachers.slice().sort((a,b)=>a.name.localeCompare(b.name,'ar')):db.sections.slice().sort((a,b)=>(db.stages.find(g=>g.id===a.stageId)?.order||0)-(db.stages.find(g=>g.id===b.stageId)?.order||0)||a.name.localeCompare(b.name,'ar'));
  wrap.innerHTML=`<label>${m==='teacher'?'المدرس':'الشعبة'}</label><select id="ttEntity">${list.map(x=>{const g=db.stages.find(v=>v.id===x.stageId);return `<option value="${esc(x.id)}">${esc(m==='teacher'?x.name:(g?.name||'')+' '+x.name)}</option>`}).join('')}</select>`;
  const sel=$('#ttEntity');if(pref.mode===m&&list.some(x=>x.id===pref.id))sel.value=pref.id;
  const redraw=()=>{window.ttPreferred={mode:m,id:sel.value};view.innerHTML=focusedTimetable(m,sel.value);bindCells()};sel.onchange=redraw;redraw()}
- mode.onchange=draw;draw();$('#gapGo').onclick=()=>{page='gapDiagnosis';render()};$('#ttProblems').onclick=()=>alert(`${counts.errors} أخطاء — ${counts.warnings} تحذيرات`);
- $('#manualUndo').onclick=undoManual;$('#manualLog').onclick=()=>alert((db.manualHistory||[]).slice(-15).reverse().map(h=>`${new Date(h.at).toLocaleString('ar-IQ')} — ${h.type} (${h.before.length} حصة)`).join('\n')||'لا توجد تعديلات بعد');$('#ttPrint').onclick=()=>printSelectedTimetable(window.ttPreferred);$('#ttPrintAllTeachers').onclick=printAllTeacherCards;if($('#ttPrintAllSections'))$('#ttPrintAllSections').onclick=printAllSectionCards;
+ mode.onchange=draw;draw();$('#ttImage').onclick=async()=>{const pick=window.ttPreferred||{mode:'school'};const btn=$('#ttImage'),status=$('#ttImageStatus');if((pick.mode==='teacher'||pick.mode==='section')&&!pick.id){status.textContent='اختر المدرس أو الشعبة أولاً';return}btn.disabled=true;status.textContent='جارٍ إعداد الصورة…';try{await exportSchedulePNG(pick.mode==='school'?'all':pick.mode,pick.id||'');status.textContent='تم إرسال الصورة للتنزيل أو المشاركة.'}catch(e){status.textContent='تعذر حفظ الصورة: '+String(e.message||e)}finally{btn.disabled=false}};$('#gapGo').onclick=()=>{page='gapDiagnosis';render()};$('#ttProblems').onclick=()=>alert(`${counts.errors} أخطاء — ${counts.warnings} تحذيرات`);
+ $('#manualBatch').onclick=batchManualEditor;$('#manualUndo').onclick=undoManual;$('#manualLog').onclick=()=>alert((db.manualHistory||[]).slice(-15).reverse().map(h=>`${new Date(h.at).toLocaleString('ar-IQ')} — ${h.type} (${h.before.length} حصة)`).join('\n')||'لا توجد تعديلات بعد');$('#ttPrint').onclick=()=>printSelectedTimetable(window.ttPreferred);$('#ttPrintAllTeachers').onclick=printAllTeacherCards;
 }
 function formalHeader(label){const p=db.printSettings;return `<div class="formal-head"><div class="formal-side">جمهورية العراق<br>وزارة التربية<br><small>العام الدراسي: ${esc(db.school.year||'—')}</small></div><div class="formal-center">${p.logo&&p.logoPosition==='center'?`<img class="school-logo" src="${p.logo}" alt="شعار المدرسة">`:''}<h1>${esc(db.school.name||'اسم المدرسة')}</h1><h2>${esc(p.title||'جدول الحصص الأسبوعية')}</h2><h3>${esc(label)}</h3></div><div class="formal-side">${p.logo&&p.logoPosition==='left'?`<img class="school-logo" src="${p.logo}" alt="شعار المدرسة">`:''}تاريخ بدء التطبيق<br><b>${esc(p.startDate||'____ / ____ / ____')}</b>${p.logo&&p.logoPosition==='right'?`<img class="school-logo" src="${p.logo}" alt="شعار المدرسة">`:''}</div></div>`}
 function formalFooter(){const p=db.printSettings;return `<footer class="print-footer">${p.showNotes?`<div class="print-reasons"><strong>أسباب تغيير الجدول والملاحظات:</strong><p>${esc(p.changeReasons||'—')}</p>${p.footer?`<p>${esc(p.footer)}</p>`:''}</div>`:''}${p.showSignatures?`<div class="print-signatures">${[p.signature1,p.signature2,p.signature3].map(x=>`<div><b>${esc(x)}</b><span>التوقيع: ______________</span></div>`).join('')}</div>`:''}</footer>`}
@@ -1029,82 +1170,11 @@ function teacherCard(teacherId){
 }
 function teacherCardCSS(){return `
 @page{size:A4 landscape;margin:7mm}*{box-sizing:border-box}html,body{margin:0;background:#fff;color:#142c46;font-family:Tahoma,Arial,sans-serif;direction:rtl}body{padding:0}.teacher-card{width:100%;height:190mm;max-height:190mm;overflow:hidden;display:flex;flex-direction:column;break-after:page;page-break-after:always;background:white}.teacher-card:last-child{break-after:auto;page-break-after:auto}.tc-head{display:grid;grid-template-columns:1fr 2.5fr 1fr;align-items:center;background:#102C50;color:#fff;border-bottom:3px solid #C8A65A;min-height:34mm;padding:3mm 6mm}.tc-side{font-size:10px;line-height:1.9}.tc-left{text-align:left}.tc-brand{text-align:center}.tc-brand img{width:12mm;height:12mm;object-fit:contain;vertical-align:middle}.tc-school{font-size:17px;color:#E7CB8E;font-weight:800}.tc-brand h1{font-size:22px;line-height:1.4;margin:1mm 0;font-weight:900}.tc-subtitle{font-size:10px;color:#e1e8f1}.tc-person{display:flex;justify-content:space-between;align-items:center;gap:8mm;background:#FAF8F3;border:1px solid #E5D9BE;padding:3mm 5mm;margin:3mm 0;min-height:26mm}.tc-label{font-size:10px;color:#6a7687}.tc-person h2{font-size:21px;margin:1mm 0 2mm}.tc-specialty{font-size:11px}.tc-stats{display:flex;gap:2mm}.tc-stats>div{border:1px solid #D6DCE5;background:white;min-width:26mm;max-width:44mm;padding:2mm;text-align:center;border-radius:3px}.tc-stats b{display:block;font-size:17px;color:#102C50}.tc-stats span{display:block;font-size:9px;color:#64748b}.tc-stats .tc-free b{font-size:11px;min-height:20px}.tc-table{border-collapse:collapse;table-layout:fixed;width:100%;flex:1;min-height:0}.tc-table th,.tc-table td{border:1px solid #c8d0d9;text-align:center;vertical-align:middle;padding:1.5mm 1mm}.tc-table thead th{background:#173c63;color:#fff;font-size:12px;height:12mm;border-color:#C8A65A}.tc-table thead th:first-child{width:19mm}.tc-period{background:#edf1f6;font-size:13px;font-weight:900;width:19mm}.tc-lesson{background:#f3f0fa}.tc-lesson strong{display:block;font-size:13px;line-height:1.35;color:#152e49}.tc-lesson span{display:block;font-size:10px;color:#53647a;margin-top:1mm}.tc-empty{background:#fff}.tc-off{background:#f0f1f3;color:#a1a8b2}.tc-reasons{display:flex;gap:4mm;align-items:center;border-top:2px solid #C8A65A;padding:2mm 3mm;font-size:10px;min-height:10mm}.tc-reasons span{color:#53647a}.tc-signatures{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;padding:2mm 0 1mm;min-height:17mm}.tc-signatures b{display:block;font-size:11px}.tc-signatures span{display:block;font-size:9px;color:#64748b;margin-top:3mm}.tc-bottom{font-size:8px;color:#8994a3;text-align:center;border-top:1px solid #e3e8ee;padding-top:1mm}.tc-bw,.tc-bw *{color:#000!important}.tc-bw .tc-head{background:#e0e0e0!important;border-bottom:3px solid #555!important}.tc-bw .tc-school,.tc-bw .tc-subtitle{color:#000!important}.tc-bw .tc-person{background:#f5f5f5!important;border-color:#888!important}.tc-bw .tc-table thead th{background:#d5d5d5!important;color:#000!important;border-color:#666!important}.tc-bw .tc-lesson{background:#f0f0f0!important}.tc-bw .tc-period{background:#e6e6e6!important}.tc-bw .tc-reasons{border-color:#555!important}@media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{margin:0!important}}`}
-// ===== جدول المدرس/الشعبة الموحّد: مشهد واحد (أبعاد بالـmm) يقرؤه رسّام HTML للـPDF ورسّام Canvas للصورة =====
-const FOCUS_FONT="Tahoma,'Geeza Pro','Segoe UI','Noto Naskh Arabic','DejaVu Sans',Arial,sans-serif";
-const fcHex=c=>/^#[0-9a-f]{6}$/i.test(String(c||''))?c:'#DCE8F2';
-const fcMix=(a,b,t)=>{a=fcHex(a);b=fcHex(b);const g=(h,i)=>parseInt(h.substr(1+i*2,2),16),m=i=>Math.round(g(a,i)*(1-t)+g(b,i)*t).toString(16).padStart(2,'0');return '#'+m(0)+m(1)+m(2)};
-function focusModel(mode,id){
- const p=db.printSettings,days=db.days.filter(d=>d.active&&d.periods>0).sort((a,b)=>a.order-b.order);if(!days.length)return null;
- const sec=mode==='section'?db.sections.find(x=>x.id===id):null,teacher=mode==='teacher'?db.teachers.find(x=>x.id===id):null;if(!sec&&!teacher)return null;
- const lessons=db.timetable.filter(e=>mode==='teacher'?e.teacherId===id:e.sectionId===id),idx=new Map(lessons.map(e=>[e.dayId+'|'+e.period,e]));
- const maxP=Math.max(1,...days.map(d=>d.periods)),colors=p.printMode!=='bw'&&p.showColors!==false;
- const cellOf=(d,pr)=>{const lim=sec?sectionDayPeriods(sec,d):d.periods;if(pr>lim)return {type:'off'};const e=idx.get(d.id+'|'+pr);if(!e)return {type:'empty'};
-  const su=db.subjects.find(s=>s.id===e.subjectId),second=mode==='teacher'?exportSectionName(e.sectionId):(p.showTeachers===false?'':(db.teachers.find(t=>t.id===e.teacherId)?.name||''));
-  return {type:'lesson',sub:su?.name||'—',second,color:colors?fcHex(su?.color):'#F5F7FA'}};
- const subjects=[...new Set(lessons.map(e=>db.subjects.find(s=>s.id===e.subjectId)?.name).filter(Boolean))];
- const withLessons=new Set(lessons.map(e=>e.dayId)),free=days.filter(d=>!withLessons.has(d.id)).map(d=>d.name).join('، ')||'لا يوجد';
- const stage=sec&&db.stages.find(g=>g.id===sec.stageId);
- const chips=teacher?[['التخصص',teacher.specialization||teacher.specialty||subjects.join('، ')||'—'],['الحصص الأسبوعية',String(lessons.length)],['أيام التدريس',withLessons.size+' من '+days.length],['أيام الفراغ',free]]
-  :[['المرحلة',stage?stageDisplayName(stage):'—'],['الحصص الأسبوعية',String(lessons.length)],['عدد المواد',String(subjects.length)],['عدد المدرسين',String(new Set(lessons.map(e=>e.teacherId)).size)]];
- return {mode,bw:p.printMode==='bw',colors,name:teacher?teacher.name:exportSectionName(id),nameLabel:teacher?'اسم المدرس':'الشعبة',title:teacher?'بطاقة الجدول الأسبوعي للمدرس':'الجدول الأسبوعي للشعبة',chips,
-  days:days.map(d=>({name:d.name,count:lessons.filter(e=>e.dayId===d.id).length})),rows:Array.from({length:maxP},(_,i)=>({period:i+1,cells:days.map(d=>cellOf(d,i+1))})),
-  school:db.school.name||'اسم المدرسة',year:db.school.year||'—',start:p.startDate||'غير محدد',logo:p.logoPosition==='none'?'':(p.logo||''),
-  notes:p.showNotes!==false?(p.changeReasons||'—'):null,sigs:p.showSignatures!==false?[p.signature1||'منظّم الجدول',p.signature2||'معاون المدير',p.signature3||'مدير المدرسة']:null}}
-function focusScene(m){
- const bw=m.bw,C={navy:bw?'#2B2B2B':'#102C50',navy2:bw?'#444444':'#244669',gold:bw?'#8C8C8C':'#C8A65A',goldTxt:bw?'#E5E5E5':'#EAD6A4',sub:bw?'#E5E5E5':'#C9D6E6',ink:bw?'#111111':'#0F2740',ink2:bw?'#333333':'#3B4F66',ivory:bw?'#F7F7F7':'#F4EFE3',ivoryB:bw?'#BBBBBB':'#D4C29A',chip:bw?'#F2F2F2':'#EEF3F8',chipB:bw?'#BBBBBB':'#C9D6E6',period:bw?'#333333':'#1B3A5F'};
- const it=[],R=(x,y,w,h,r,fill,stroke)=>it.push({k:'rect',x,y,w,h,r,fill,stroke}),X=(x,y,w,h,align,paras)=>it.push({k:'text',x,y,w,h,align,paras}),P=(s,size,color,bold,max=1,lh)=>({s:String(s),size,color,bold,max,lh:lh||size*1.25});
- R(8,8,281,28,3,C.navy);R(8,34.8,281,1.2,0,C.gold);
- const hasLogo=!!m.logo;if(hasLogo)it.push({k:'img',x:13,y:11,w:20,h:20,src:m.logo});
- X(200,10,83,24,'r',[P('جمهورية العراق',3.1,C.sub,false),P('وزارة التربية',3.1,C.sub,false),P('العام الدراسي: '+m.year,2.8,C.sub,false)]);
- X(78,10,141,24,'c',[P(m.school,6.2,C.goldTxt,true,1),P(m.title,4.6,'#FFFFFF',true,1,6),P('وثيقة تنظيم الحصص الأسبوعية',2.9,C.sub,false)]);
- X(hasLogo?36:14,12,50,20,'l',[P('تاريخ بدء التطبيق',2.8,C.sub,false),P(m.start,3.6,'#FFFFFF',true,1,5.2)]);
- R(199,39,90,17,2,C.ivory,C.ivoryB);const nl=m.name.length,ns=nl>26?5.6:nl>20?6.6:nl>14?7.6:8.4;
- const two=nl>24,nz=two?4.4:ns;X(201,40,86,15,'c',[P(m.nameLabel,2.5,'#7A6A45',false,1,3.2),P(m.name,nz,C.ink,true,two?2:1,nz*1.2)]);
- m.chips.forEach((c,i)=>{const w=44.8,x=8+(3-i)*(w+2.5);R(x,39,w,17,2,C.chip,C.chipB);const v=String(c[1]);X(x+1,40,w-2,15,'c',[P(c[0],2.5,'#5B7089',false,1,3.2),P(v.length>26?v.slice(0,25)+'…':v,v.length>18?3.1:3.8,C.ink,true,1,4.6)])});
- const n=m.days.length,g=0.8,pw=14,dw=(267-g*n)/n,top=59,hh=10,rows=m.rows.length,rowH=Math.min(16,(176-3-top-hh-g-g*(rows-1))/rows);
- R(275,top,pw,hh,1.4,C.navy);X(275,top,pw,hh,'c',[P('الحصة',3,C.goldTxt,true)]);
- m.days.forEach((d,i)=>{const x=275-g-dw-i*(dw+g);R(x,top,dw,hh,1.4,C.navy2);X(x,top,dw,hh,'c',[P(d.name,4.2,'#FFFFFF',true,1,5),P(d.count+' حصة',2.4,C.goldTxt,false,1,3)])});
- m.rows.forEach((r,ri)=>{const y=top+hh+g+ri*(rowH+g);R(275,y,pw,rowH,1.4,C.period);X(275,y,pw,rowH,'c',[P(r.period,5.4,C.goldTxt,true)]);
-  r.cells.forEach((c,i)=>{const x=275-g-dw-i*(dw+g);
-   if(c.type==='lesson'){const acc=m.colors?fcMix(c.color,'#000000',.15):'#555555',tint=m.colors?fcMix(c.color,'#FFFFFF',.84):'#F5F7FA';R(x,y,dw,rowH,1.4,tint,m.colors?fcMix(c.color,'#FFFFFF',.55):'#DDE3EA');R(x+dw-1.7,y+0.7,1.2,rowH-1.4,0.6,acc);const ps=[P(c.sub,3.6,C.ink,true,2,4.3)];if(c.second)ps.push(P(c.second,2.7,C.ink2,false,1,3.5));X(x+1.5,y,dw-4,rowH,'c',ps)}
-   else if(c.type==='off'){R(x,y,dw,rowH,1.4,'#EEF1F4','#DDE3EA');X(x,y,dw,rowH,'c',[P('—',3.4,'#9AA7B5',false)])}
-   else R(x,y,dw,rowH,1.4,'#FAFBFD','#E3E9F0')})});
- if(m.notes!==null){R(8,176,281,11,1.6,'#FBFAF7',C.ivoryB);X(10,176,277,11,'r',[P('أسباب تغيير الجدول والملاحظات: '+m.notes,2.9,'#475569',false,2,3.6)])}
- if(m.sigs)m.sigs.forEach((s,i)=>{const x=8+(2-i)*94;X(x,189,93,13,'c',[P(s,3,C.navy,true,1,4),P('التوقيع: ______________________',2.8,'#475569',false,1,4.5)])});
- return {W:297,H:210,items:it}}
-const fcPx=v=>Math.round(v*1000)/1000+'mm';
-function focusSceneHTML(sc){return `<section class="fc">${sc.items.map(o=>{const pos=`left:${fcPx(o.x)};top:${fcPx(o.y)};width:${fcPx(o.w)};height:${fcPx(o.h)}`;
- if(o.k==='rect')return `<div class="fc-r" style="${pos};background:${o.fill};${o.stroke?`border:.25mm solid ${o.stroke};`:''}border-radius:${fcPx(o.r)}"></div>`;
- if(o.k==='img')return `<img class="fc-r" style="${pos};object-fit:contain" src="${esc(o.src)}" alt="">`;
- const al=o.align==='c'?'center':o.align==='r'?'right':'left';
- return `<div class="fc-t" style="${pos}"><div class="fc-tc" style="text-align:${al};height:${fcPx(o.h)}">${o.paras.map(q=>`<div class="fc-p${q.max>1?' fc-m':''}" style="font-size:${fcPx(q.size)};line-height:${fcPx(q.lh)};max-height:${fcPx(q.lh*q.max)};color:${q.color};font-weight:${q.bold?700:400};${q.max>1?`-webkit-line-clamp:${q.max};`:''}">${esc(q.s)}</div>`).join('')}</div></div>`}).join('')}</section>`}
-function focusCardCSS(){return `@page{size:297mm 210mm;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff}body{font-family:${FOCUS_FONT};direction:rtl;-webkit-print-color-adjust:exact;print-color-adjust:exact}.fc{position:relative;width:297mm;height:210mm;overflow:hidden;page-break-after:always;break-after:page;background:#fff}.fc:last-child{page-break-after:auto;break-after:auto}.fc-r{position:absolute;display:block}.fc-t{position:absolute;display:table;table-layout:fixed}.fc-tc{display:table-cell;vertical-align:middle;padding:0 .8mm}.fc-p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fc-p.fc-m{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;word-break:break-word}@media screen{body{background:#e9eef3}.fc{margin:6mm auto;box-shadow:0 2px 14px #0003}}`}
-async function drawFocusScene(sc,k=6){
- const cv=document.createElement('canvas');cv.width=Math.round(sc.W*k);cv.height=Math.round(sc.H*k);const c=cv.getContext('2d');if(!c)throw new Error('المتصفح لا يدعم الرسم');c.direction='rtl';c.fillStyle='#fff';c.fillRect(0,0,cv.width,cv.height);
- const rr=(x,y,w,h,r)=>{r=Math.min(r,w/2,h/2);c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()};
- const wrap=(s,max,font,maxW)=>{c.font=font;const words=String(s).split(/\s+/);let lines=[''];for(const w of words){const t=lines[lines.length-1]?lines[lines.length-1]+' '+w:w;if(c.measureText(t).width<=maxW||!lines[lines.length-1])lines[lines.length-1]=t;else lines.push(w)}
-  if(lines.length>max){lines=lines.slice(0,max);let l=lines[max-1];while(l.length>1&&c.measureText(l+'…').width>maxW)l=l.slice(0,-1);lines[max-1]=l+'…'}else if(max===1&&c.measureText(lines[0]).width>maxW){let l=lines[0];while(l.length>1&&c.measureText(l+'…').width>maxW)l=l.slice(0,-1);lines[0]=l+'…'}return lines};
- for(const o of sc.items){
-  if(o.k==='rect'){rr(o.x*k,o.y*k,o.w*k,o.h*k,o.r*k);c.fillStyle=o.fill;c.fill();if(o.stroke){rr((o.x+.125)*k,(o.y+.125)*k,(o.w-.25)*k,(o.h-.25)*k,o.r*k);c.strokeStyle=o.stroke;c.lineWidth=.25*k;c.stroke()}}
-  else if(o.k==='img'){try{const im=new Image();im.src=o.src;await new Promise((ok,no)=>{if(im.complete&&im.naturalWidth)return ok();im.onload=ok;im.onerror=no});const s=Math.min(o.w*k/im.naturalWidth,o.h*k/im.naturalHeight),w=im.naturalWidth*s,h=im.naturalHeight*s;c.drawImage(im,o.x*k+(o.w*k-w)/2,o.y*k+(o.h*k-h)/2,w,h)}catch(e){}}
-  else{const pad=.8,maxW=(o.w-pad*2)*k,blocks=o.paras.map(q=>{const font=`${q.bold?700:400} ${q.size*k}px ${FOCUS_FONT}`;return {q,font,lines:wrap(q.s,q.max,font,maxW)}}),total=blocks.reduce((s,b)=>s+b.lines.length*b.q.lh,0);let y=o.y+(o.h-total)/2;
-   const tx=o.align==='c'?(o.x+o.w/2)*k:o.align==='r'?(o.x+o.w-pad)*k:(o.x+pad)*k;
-   for(const b of blocks){c.font=b.font;c.fillStyle=b.q.color;c.textAlign=o.align==='c'?'center':o.align==='r'?'right':'left';c.textBaseline='middle';c.direction='rtl';b.lines.forEach(l=>{c.fillText(l,tx,(y+b.q.lh/2)*k);y+=b.q.lh})}}}
- return cv}
-function printFocusCards(list){const html=list.map(x=>{const m=focusModel(x.mode,x.id);return m?focusSceneHTML(focusScene(m)):''}).filter(Boolean).join('');if(!html)return alert('لا توجد جداول للطباعة. ولّد الجدول أولاً.');const w=window.open('','_blank');if(!w)return alert('اسمح بفتح النوافذ المنبثقة للطباعة');w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>جدول الحصص</title><style>${focusCardCSS()}</style></head><body>${html}<script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`);w.document.close()}
-function printAllSectionCards(){printFocusCards(db.sections.slice().sort((a,b)=>(db.stages.find(g=>g.id===a.stageId)?.order||0)-(db.stages.find(g=>g.id===b.stageId)?.order||0)||a.order-b.order).filter(s=>db.timetable.some(e=>e.sectionId===s.id)).map(s=>({mode:'section',id:s.id})))}
-async function exportFocusPNG(mode,id){const m=focusModel(mode,id);if(!m)throw new Error('لا يمكن إنشاء الصورة: تحقق من الأيام والبيانات');const cv=await drawFocusScene(focusScene(m),6);
- const blob=await new Promise((resolve,reject)=>cv.toBlob(b=>b?resolve(b):reject(new Error('فشل إنشاء PNG')),'image/png'));const filename='masar-timetable-'+mode+(id?'-'+id:'')+'.png';const file=typeof File==='function'?new File([blob],filename,{type:'image/png'}):null;
- if(file&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:'جدول الحصص'});return}catch(e){if(e.name==='AbortError')return}}
- const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),15000)}
-
-
-function printTeacherCardsLegacy(ids){const html=ids.map(teacherCard).filter(Boolean).join('');if(!html)return alert('لا توجد بطاقات مدرسين للطباعة');const w=window.open('','_blank');if(!w)return alert('اسمح بفتح النوافذ المنبثقة للطباعة');w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>بطاقات الجداول الأسبوعية للمدرسين</title><style>${teacherCardCSS()+premiumTeacherCSS()}</style></head><body>${html}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close()}
-function printTeacherCards(ids){printFocusCards(ids.map(id=>({mode:'teacher',id})))}
+function printTeacherCards(ids){const html=ids.map(teacherCard).filter(Boolean).join('');if(!html)return alert('لا توجد بطاقات مدرسين للطباعة');const w=window.open('','_blank');if(!w)return alert('اسمح بفتح النوافذ المنبثقة للطباعة');w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>بطاقات الجداول الأسبوعية للمدرسين</title><style>${teacherCardCSS()+premiumTeacherCSS()}</style></head><body>${html}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close()}
 function printAllTeacherCards(){const ids=db.teachers.filter(t=>db.timetable.some(e=>e.teacherId===t.id)).sort((a,b)=>a.name.localeCompare(b.name,'ar')).map(t=>t.id);printTeacherCards(ids)}
 function printSelectedTimetable(pick){
  const p=db.printSettings;const label=pick.mode==='teacher'?db.teachers.find(x=>x.id===pick.id)?.name:pick.mode==='section'?(()=>{const sec=db.sections.find(x=>x.id===pick.id),g=db.stages.find(x=>x.id===sec?.stageId);return (g?.name||'')+' '+(sec?.name||'')})():'المدرسة كاملة';
- if(pick.mode==='teacher'||pick.mode==='section'){printFocusCards([{mode:pick.mode,id:pick.id}]);return;}
+ if(pick.mode==='teacher'){printTeacherCards([pick.id]);return;}
  const table=pick.mode==='school'?timetableTable():focusedTimetable(pick.mode,pick.id);if(pick.mode==='school'){const html=printDocument();const w=window.open('','_blank');if(!w)return alert('اسمح بفتح النوافذ المنبثقة للطباعة');w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>الجدول المدرسي</title><style>${printCSS()+premiumPrintCSS()}</style></head><body>${html}<script>window.onload=()=>setTimeout(()=>window.print(),350)<\/script></body></html>`);w.document.close();return;}
  const html=`<article class="print-sheet ${printPresentationClass()}">${formalHeader(label)}${table}${formalFooter()}</article>`;
  const w=window.open('','_blank');if(!w)return alert('اسمح بفتح النوافذ المنبثقة للطباعة');
@@ -1231,7 +1301,6 @@ function printSetup(){
 function exportSectionName(id){const sec=db.sections.find(x=>x.id===id);if(!sec)return '—';const stage=db.stages.find(g=>g.id===sec.stageId);return (stage?stageDisplayName(stage):'مرحلة')+' '+sec.name;}
 const exportPalettes={g1:['#E7F0F9','#244E78','#587B9B'],g2:['#E8F3E9','#315F3B','#6F8F72'],g3:['#F7EEE3','#785332','#9A7B60'],g4:['#EEEAF7','#59477E','#7D7398'],g5:['#FAEBEF','#85445A','#A16F78'],g6:['#E4F2F1','#27616A','#557F83']};
 async function exportSchedulePNG(mode,id){
- if(mode==='teacher'||mode==='section')return exportFocusPNG(mode,id);
  const stages=mode==='all'?db.stages.map(x=>x.id):mode==='middle'?['g1','g2','g3']:mode==='high'?['g4','g5','g6']:mode==='stage'?[id]:null;
  const sec=mode==='section'?db.sections.filter(x=>x.id===id):db.sections.filter(x=>!stages||stages.includes(x.stageId));
  const sections=mode==='teacher'?[]:sec.slice().sort((a,b)=>(db.stages.find(g=>g.id===a.stageId)?.order||0)-(db.stages.find(g=>g.id===b.stageId)?.order||0)||a.order-b.order);
@@ -1277,7 +1346,7 @@ async function exportSchedulePNG(mode,id){
  if(db.printSettings.showNotes!==false){c.fillStyle='#FBFAF7';c.fillRect(margin,height-footH+5,width-2*margin,47);c.strokeStyle='#D4C29A';c.strokeRect(margin+.5,height-footH+5.5,width-2*margin-1,46);text(`أسباب تغيير الجدول: ${db.printSettings.changeReasons||'—'}`,width/2,height-footH+20,14,'#475569');if(db.printSettings.footer)text(db.printSettings.footer,width/2,height-footH+42,12,'#475569')}
  if(db.printSettings.showSignatures!==false){const labels=[db.printSettings.signature1||'منظّم الجدول',db.printSettings.signature2||'معاون المدير',db.printSettings.signature3||'مدير المدرسة'];labels.forEach((label,i)=>{const x=width*(i+1)/4;text(label,x,height-37,13,'#17324D',true);text('التوقيع: __________',x,height-17,11,'#475569')})}
  const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('فشل إنشاء PNG')),'image/png'));const filename='masar-timetable-'+mode+(id?'-'+id:'')+'.png';const file=typeof File==='function'?new File([blob],filename,{type:'image/png'}):null;
- if(file&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:'جدول الحصص'});return}catch(e){if(e.name==='AbortError')return}}
+ if(file&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:'جدول الحصص'});return}catch(e){if(e.name==='AbortError')throw new Error('أُلغيت مشاركة الصورة')}}
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),15000);
 }
 
