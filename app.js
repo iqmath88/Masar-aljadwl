@@ -1,4 +1,4 @@
-const APP_VERSION='0.9.19.1';
+const APP_VERSION='0.9.19.2';
 const KEY='school-timetable-v01';
 const stageDefaults=[['الأول',1,'#587B9B'],['الثاني',2,'#6F8F72'],['الثالث',3,'#9A7B60'],['الرابع',4,'#7D7398'],['الخامس',5,'#A16F78'],['السادس',6,'#557F83']];
 const defaultDays=[['الأحد',7,true],['الاثنين',7,true],['الثلاثاء',6,true],['الأربعاء',7,true],['الخميس',5,true],['الجمعة',0,false],['السبت',0,false]];
@@ -337,7 +337,42 @@ function loads(){
   const grand=document.querySelector('[data-load-grand-total]');if(grand)grand.textContent=[...sums.values()].reduce((n,v)=>n+v,0);
  };
  inputs.forEach(i=>i.addEventListener('input',updateTotals));
- $('#saveLoads').onclick=()=>{inputs.forEach(i=>db.stageLoads[i.dataset.load]=numberOf(i));save();updateTotals();alert('حُفظت خطة الحصص. لا تتغير التكليفات القديمة تلقائياً.')};
+ $('#saveLoads').onclick=()=>{
+  const next={...db.stageLoads};inputs.forEach(i=>next[i.dataset.load]=numberOf(i));
+  const changed=inputs.filter(i=>numberOf(i)!==loadFor(...i.dataset.load.split('|')));
+  if(!changed.length){alert('لا توجد تغييرات في خطة الحصص.');return}
+  const proposed=new Map(), problems=[];
+  for(const i of changed){const [stageId,subjectId]=i.dataset.load.split('|'),quota=numberOf(i);
+   for(const sec of db.sections.filter(x=>x.stageId===stageId)){
+    const as=db.assignments.filter(a=>a.sectionId===sec.id&&a.subjectId===subjectId);
+    if(as.length>1){problems.push('أكثر من تكليف للمادة في الشعبة '+sec.name);continue}
+    if(as.length===1)proposed.set(as[0].id,quota);
+    else if(quota>0)problems.push('لا يوجد تكليف للمادة في الشعبة '+sec.name+'؛ أضفه أولاً من إدارة التكليفات');
+   }
+  }
+  if(problems.length){alert('لا يمكن تطبيق الخطة تلقائياً:\n'+problems.slice(0,12).join('\n'));return}
+  const excess=[],deficit=[];
+  for(const [id,quota] of proposed){const entries=db.timetable.filter(e=>e.assignmentId===id),locked=entries.filter(e=>e.locked),a=db.assignments.find(x=>x.id===id);
+   if(locked.length>quota){problems.push('عدد الحصص المثبتة أكبر من النصاب الجديد للتكليف '+id);continue}
+   if(entries.length>quota){const removable=entries.filter(e=>!e.locked).sort((x,y)=>String(y.dayId).localeCompare(String(x.dayId))||y.period-x.period);excess.push(...removable.slice(0,entries.length-quota))}
+   if(entries.length<quota)deficit.push({a,missing:quota-entries.length});
+  }
+  if(problems.length){alert('لا يمكن تعديل حصص مثبتة:\n'+problems.join('\n'));return}
+  const delta=[...proposed].filter(([id,q])=>+db.assignments.find(a=>a.id===id).weeklyPeriods!==q).length;
+  const msg='ستُحدّث خطة المواد وتكليفات '+delta+' شعبة/مادة.\nستُزال '+excess.length+' حصة زائدة من الجدول الحالي، وستبقى '+deficit.reduce((n,x)=>n+x.missing,0)+' حصة غير موزعة تحتاج إلى استكمال التوليد.\nسيُحفظ الجدول الأصلي كنسخة استرجاع. هل توافق؟';
+  if(!confirm(msg))return;
+  if(!preserveTimetable('تغيير حصص المراحل مع التكليفات والجدول'))return;
+  const original=structuredClone(db);
+  db.stageLoads=next;
+  for(const [id,quota] of proposed){const a=db.assignments.find(x=>x.id===id);if(a)a.weeklyPeriods=quota}
+  const removed=new Set(excess.map(e=>e.id));db.timetable=db.timetable.filter(e=>!removed.has(e.id));
+  // Remove fixed lesson references only for entries removed by the quota reduction.
+  const removedSlots=new Set(excess.map(e=>e.assignmentId+'|'+e.dayId+'|'+e.period));
+  db.fixedLessons=db.fixedLessons.filter(f=>!removedSlots.has(f.assignmentId+'|'+f.dayId+'|'+f.period));
+  db.manualHistory=[];
+  if(!save()){db=original;return}
+  loads();alert('حُفظت التغييرات على خطة المواد والتكليفات والجدول المشترك. '+(deficit.length?'توجد حصص ناقصة؛ افتح التدقيق ثم استكمل توزيعها.':'راجع التدقيق قبل اعتماد الجدول.'));
+ };
 }
 
 function assignments(){
@@ -1612,7 +1647,10 @@ function dndCommit(ev){const c=manualValidate(ev.changes),adv=dndAdvanced(ev.cha
  const before=ev.changes.map(x=>{const e=db.timetable.find(y=>y.id===x.id);return {id:e.id,dayId:e.dayId,period:e.period}});
  ev.changes.forEach(x=>Object.assign(db.timetable.find(e=>e.id===x.id),x));db.manualHistory??=[];db.manualHistory.push({id:uid('edit'),at:new Date().toISOString(),type:ev.type,before,after:ev.changes.map(x=>({...x}))});if(db.manualHistory.length>100)db.manualHistory.shift();
  if(!save()){ev.changes.forEach((x,i)=>Object.assign(db.timetable.find(e=>e.id===x.id),before[i]));db.manualHistory.pop();workspaceTT();dndToast('⛔ تعذر الحفظ؛ أُلغي التعديل في الذاكرة. صدّر نسخة احتياطية.','bad');return false}
- workspaceTT();const w=[...c.warnings,...ev.warnings.filter(x=>!c.warnings.includes(x))];dndToast((w.length?'⚠️ ':'✓ ')+ev.type+(w.length?' — '+w.join('، '):''),w.length?'warn':'ok',true);return true}
+ // All timetable views read the same db.timetable; redraw from the saved shared state.
+ const current=window.ttPreferred?{...window.ttPreferred}:{mode:'school'};
+ workspaceTT();window.ttPreferred=current;
+ const w=[...c.warnings,...ev.warnings.filter(x=>!c.warnings.includes(x))];dndToast((w.length?'⚠️ ':'✓ ')+ev.type+(w.length?' — '+w.join('، '):''),w.length?'warn':'ok',true);return true}
 function lessonSheet(id){const e=db.timetable.find(x=>x.id===id);if(!e)return;const o=document.createElement('div');o.className='edit-overlay';
  o.innerHTML=`<div class="edit-card"><div class="edit-head"><h3>خيارات الحصة</h3><button class="icon-close" type="button" aria-label="إغلاق">×</button></div><div class="notice">${esc(manualLabel(e))}</div><div class="notice">لنقل الحصة اسحبها إلى خانة أخرى (على الجوال: اضغط مطولاً ثم اسحب).</div><div class="actions"><button id="shLock">${e.locked?'🔓 فتح التثبيت':'🔒 تثبيت الحصة'}</button><button class="secondary" id="shMove">نقل/تبديل بالقوائم</button><button class="secondary" id="shClose">إغلاق</button></div></div>`;
  document.body.appendChild(o);const close=()=>o.remove();o.querySelector('.icon-close').onclick=close;o.querySelector('#shClose').onclick=close;o.querySelector('#shLock').onclick=()=>{close();toggleTimetableLock(id)};o.querySelector('#shMove').onclick=()=>{close();moveTimetableEntry(id)}}
@@ -2003,3 +2041,5 @@ setTimeout(backupReminder,900);
 
 // Explicit cloud transfer hooks: no automatic replacement of local data.
 window.MASAR_CLOUD_BRIDGE={exportData:()=>structuredClone(db),importData:(data)=>{const incoming=migrate(structuredClone(data));if(!Array.isArray(incoming.sections)||!Array.isArray(incoming.assignments)||!Array.isArray(incoming.timetable))throw Error('بيانات غير مكتملة');if(!preserveTimetable('استيراد مدرسة من السحابة'))throw Error('أُلغي حفظ نسخة الأمان');db=incoming;if(!save())throw Error('فشل الحفظ المحلي');render();},refresh:()=>render()};
+
+window.addEventListener('storage',ev=>{if(ev.key===KEY&&ev.newValue){try{db=migrate(JSON.parse(ev.newValue));render()}catch(err){console.warn('Masar sync failed',err)}}});
