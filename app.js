@@ -1,4 +1,4 @@
-const APP_VERSION='0.9.18.1';
+const APP_VERSION='0.9.19.1';
 const KEY='school-timetable-v01';
 const stageDefaults=[['الأول',1,'#587B9B'],['الثاني',2,'#6F8F72'],['الثالث',3,'#9A7B60'],['الرابع',4,'#7D7398'],['الخامس',5,'#A16F78'],['السادس',6,'#557F83']];
 const defaultDays=[['الأحد',7,true],['الاثنين',7,true],['الثلاثاء',6,true],['الأربعاء',7,true],['الخميس',5,true],['الجمعة',0,false],['السبت',0,false]];
@@ -243,7 +243,7 @@ function school(){
  const homeAuditButton=document.getElementById('homeAuditButton');if(homeAuditButton)homeAuditButton.onclick=runHomeAudit;
  document.querySelectorAll('[data-home-page]').forEach(b=>b.onclick=()=>{page=b.dataset.homePage;render();window.scrollTo({top:0,behavior:'smooth'})});
 }
-function schoolSettings(){$('#workspace').innerHTML=`<h2>إعداد المدرسة</h2>${backupProtectionUI()}${workspaceUI()}${versionsUI()}<div class="grid"><div class="field"><label>اسم المدرسة</label><input id="schoolName" value="${esc(db.school.name)}"></div><div class="field"><label>العام الدراسي</label><input id="schoolYear" value="${esc(db.school.year)}"></div><div class="field"><label>نوع المدرسة</label><select id="schoolType"><option value="primary" ${schoolType()==='primary'?'selected':''}>ابتدائية (الأول–السادس الابتدائي)</option><option value="secondary" ${schoolType()==='secondary'?'selected':''}>ثانوية (الأول–الثالث المتوسط والرابع–السادس الإعدادي)</option><option value="middle" ${schoolType()==='middle'?'selected':''}>متوسطة فقط (الأول–الثالث المتوسط)</option><option value="preparatory" ${schoolType()==='preparatory'?'selected':''}>إعدادية فقط (الرابع–السادس الإعدادي)</option></select></div></div><div class="notice">تغيير نوع المدرسة يعدّل مسميات الصفوف والتصدير فقط، ولا يحذف الشعب أو التكليفات أو الحصص. للمدرسة المتوسطة أو الإعدادية فقط، يجب أن تكون المراحل المسجلة مطابقة لطبيعة المدرسة.</div><div class="actions"><button id="saveSchool">حفظ الإعدادات</button><button class="secondary" id="importBtn">استيراد نسخة احتياطية</button><button class="secondary" id="recoveryBtn">تنزيل نسخة الاسترجاع المحلية</button><button class="danger" id="resetBtn">إعادة ضبط المشروع</button></div>`;wireBackupProtection();wireWorkspaces();wireVersions();$('#saveSchool').onclick=()=>{db.school.name=$('#schoolName').value.trim();db.school.year=$('#schoolYear').value.trim();db.school.type=$('#schoolType').value;save();schoolSettings()};$('#importBtn').onclick=()=>$('#importFile').click();$('#recoveryBtn').onclick=downloadRecovery;$('#resetBtn').onclick=()=>{if(confirm('سيتم حذف جميع البيانات المحلية. هل أنت متأكد؟')){if(!preserveTimetable('إعادة ضبط المشروع'))return;db=seed();if(save())render()}}}
+function schoolSettings(){$('#workspace').innerHTML=`<h2>إعداد المدرسة</h2>${backupProtectionUI()}${workspaceUI()}${versionsUI()}<div class="grid"><div class="field"><label>اسم المدرسة</label><input id="schoolName" value="${esc(db.school.name)}"></div><div class="field"><label>العام الدراسي</label><input id="schoolYear" value="${esc(db.school.year)}"></div><div class="field"><label>نوع المدرسة</label><select id="schoolType"><option value="primary" ${schoolType()==='primary'?'selected':''}>ابتدائية (الأول–السادس الابتدائي)</option><option value="secondary" ${schoolType()==='secondary'?'selected':''}>ثانوية (الأول–الثالث المتوسط والرابع–السادس الإعدادي)</option><option value="middle" ${schoolType()==='middle'?'selected':''}>متوسطة فقط (الأول–الثالث المتوسط)</option><option value="preparatory" ${schoolType()==='preparatory'?'selected':''}>إعدادية فقط (الرابع–السادس الإعدادي)</option></select></div></div><div class="notice">تغيير نوع المدرسة يعدّل مسميات الصفوف والتصدير فقط، ولا يحذف الشعب أو التكليفات أو الحصص. للمدرسة المتوسطة أو الإعدادية فقط، يجب أن تكون المراحل المسجلة مطابقة لطبيعة المدرسة.</div><div class="actions"><button id="saveSchool">حفظ الإعدادات</button><label class="secondary masar-import-label" for="importFile" role="button" tabindex="0">استيراد نسخة احتياطية JSON</label><button class="secondary" id="recoveryBtn">تنزيل نسخة الاسترجاع المحلية</button><button class="danger" id="resetBtn">إعادة ضبط المشروع</button></div>`;wireBackupProtection();wireWorkspaces();wireVersions();$('#saveSchool').onclick=()=>{db.school.name=$('#schoolName').value.trim();db.school.year=$('#schoolYear').value.trim();db.school.type=$('#schoolType').value;save();schoolSettings()};$('#recoveryBtn').onclick=downloadRecovery;$('#resetBtn').onclick=()=>{if(confirm('سيتم حذف جميع البيانات المحلية. هل أنت متأكد؟')){if(!preserveTimetable('إعادة ضبط المشروع'))return;db=seed();if(save())render()}}}
 function sectionDayPeriods(sec,day){const x=db.stageDayPeriods?.[sec.stageId]?.[day.id];return day.active?Math.max(0,Math.min(day.periods,Number.isFinite(+x)&&x!==undefined?+x:day.periods)):0}
 function dayCapacity(sec){return db.days.reduce((n,d)=>n+sectionDayPeriods(sec,d),0)}
 function days(){$('#workspace').innerHTML=`<h2>أيام الدوام وعدد الحصص</h2><div class="notice">يمكن أن يختلف عدد الحصص من يوم إلى آخر.</div><table><thead><tr><th>اليوم</th><th>دوام</th><th>عدد الحصص</th></tr></thead><tbody>${db.days.sort((a,b)=>a.order-b.order).map(d=>`<tr><td>${esc(d.name)}</td><td><input type="checkbox" data-active="${d.id}" ${d.active?'checked':''}></td><td><input type="number" min="0" max="12" data-periods="${d.id}" value="${d.periods}"></td></tr>`).join('')}</tbody></table><h3>تخصيص عدد الحصص حسب المرحلة واليوم</h3><div class="notice">العدد العام هو الحد الأعلى. مثال: الثلاثاء 7 حصص للمدرسة، و6 لبقية المراحل، و7 للسادس.</div><div class="tt-wrap"><table><thead><tr><th>المرحلة</th>${db.days.filter(d=>d.active).map(d=>`<th>${esc(d.name)}</th>`).join('')}</tr></thead><tbody>${db.stages.map(g=>`<tr><th>${esc(g.name)}</th>${db.days.filter(d=>d.active).map(d=>`<td><input class="stage-period-input" type="number" min="0" max="${d.periods}" data-stage-day="${g.id}|${d.id}" value="${db.stageDayPeriods[g.id]?.[d.id]??d.periods}"></td>`).join('')}</tr>`).join('')}</tbody></table></div>`;document.querySelectorAll('[data-stage-day]').forEach(x=>x.onchange=()=>{const [g,d]=x.dataset.stageDay.split('|');const max=db.days.find(v=>v.id===d).periods;if(!invalidateTimetable('تغيير حصص المرحلة')){days();return}db.stageDayPeriods[g]??={};db.stageDayPeriods[g][d]=Math.min(max,Math.max(0,+x.value||0));save();days()});document.querySelectorAll('[data-active]').forEach(x=>x.onchange=()=>{if(!invalidateTimetable('تغيير أيام الدوام')){days();return}db.days.find(d=>d.id===x.dataset.active).active=x.checked;save()});document.querySelectorAll('[data-periods]').forEach(x=>x.onchange=()=>{if(!invalidateTimetable('تغيير عدد الحصص')){days();return}let d=db.days.find(d=>d.id===x.dataset.periods);d.periods=Math.max(0,+x.value||0);d.active=d.periods>0;save();days()})}
@@ -1975,12 +1975,31 @@ async function exportSchedulePNG(mode,id){
 }
 
 $('#exportBtn').onclick=exportSafeBackup;
-$('#importFile').onchange=e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{const incoming=migrate(JSON.parse(r.result));
- if(!Array.isArray(incoming.sections)||!Array.isArray(incoming.assignments)||!Array.isArray(incoming.timetable))throw Error('بيانات غير مكتملة');
- const oldCount=db.timetable?.length||0,newCount=incoming.timetable.length;
- if(oldCount>0&&newCount===0&&!confirm('تحذير: النسخة المستوردة لا تحتوي أي حصة موزعة، بينما جدولك الحالي يحتوي '+oldCount+' حصة. هل تريد استبداله رغم ذلك؟'))return;
- if(!preserveTimetable('استيراد نسخة احتياطية'))return;
- db=incoming;if(!save())throw Error('تعذر حفظ الملف المستورد');render();alert('تم الاستيراد بنجاح — الحصص الموزعة: '+newCount)}catch{alert('ملف غير صالح')}};r.readAsText(f)};
+// A real, associated file input/label is required for reliable iPad Safari picking.
+const backupInput=document.getElementById('importFile');
+backupInput.addEventListener('change',async function(){
+ const file=this.files&&this.files[0];if(!file)return;
+ try{
+  if(!/\.json$/i.test(file.name))throw Error('اختر ملف نسخة احتياطية بصيغة JSON.');
+  const raw=await file.text();let parsed;
+  try{parsed=JSON.parse(raw)}catch(_){throw Error('الملف ليس JSON صالحاً.')} 
+  // Recovery downloads wrap the actual school data in a data property.
+  if(parsed&&parsed.data&&parsed.savedAt&&!parsed.sections)parsed=parsed.data;
+  if(!parsed||typeof parsed!=='object'||!Array.isArray(parsed.sections)||!Array.isArray(parsed.assignments)||!Array.isArray(parsed.timetable)||!Array.isArray(parsed.days)||!Array.isArray(parsed.stages)||!Array.isArray(parsed.subjects)||!Array.isArray(parsed.teachers))throw Error('النسخة لا تحتوي بيانات مدرسة مسار كاملة.');
+  const incoming=migrate(structuredClone(parsed));
+  const oldCount=db.timetable?.length||0,newCount=incoming.timetable.length;
+  if(!confirm('استيراد مدرسة: '+(incoming.school?.name||'بدون اسم')+'\nالحصص الحالية: '+oldCount+'\nالحصص المستوردة: '+newCount+'\nسيتم استبدال بيانات مساحة العمل الحالية. هل تريد المتابعة؟'))return;
+  if(oldCount>0&&newCount===0&&!confirm('تحذير: النسخة المستوردة خالية من الحصص الموزعة. هل تريد المتابعة؟'))return;
+  if(!preserveTimetable('استيراد نسخة احتياطية'))return;
+  const previous=db;db=incoming;
+  if(!save()){db=previous;throw Error('تعذر حفظ البيانات المستوردة. لم يتم اعتماد الاستيراد.')} 
+  render();alert('تم الاستيراد بنجاح — الحصص الموزعة: '+newCount);
+ }catch(err){alert('تعذر استيراد النسخة: '+(err?.message||String(err)))}
+ finally{this.value='';}
+});
 render();
 // A non-blocking reminder after initial UI paint.
 setTimeout(backupReminder,900);
+
+// Explicit cloud transfer hooks: no automatic replacement of local data.
+window.MASAR_CLOUD_BRIDGE={exportData:()=>structuredClone(db),importData:(data)=>{const incoming=migrate(structuredClone(data));if(!Array.isArray(incoming.sections)||!Array.isArray(incoming.assignments)||!Array.isArray(incoming.timetable))throw Error('بيانات غير مكتملة');if(!preserveTimetable('استيراد مدرسة من السحابة'))throw Error('أُلغي حفظ نسخة الأمان');db=incoming;if(!save())throw Error('فشل الحفظ المحلي');render();},refresh:()=>render()};
