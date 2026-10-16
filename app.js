@@ -1,4 +1,4 @@
-const APP_VERSION='0.9.19.2';
+const APP_VERSION='0.9.19.3';
 const KEY='school-timetable-v01';
 const stageDefaults=[['الأول',1,'#587B9B'],['الثاني',2,'#6F8F72'],['الثالث',3,'#9A7B60'],['الرابع',4,'#7D7398'],['الخامس',5,'#A16F78'],['السادس',6,'#557F83']];
 const defaultDays=[['الأحد',7,true],['الاثنين',7,true],['الثلاثاء',6,true],['الأربعاء',7,true],['الخميس',5,true],['الجمعة',0,false],['السبت',0,false]];
@@ -326,7 +326,7 @@ function loads(){
  const subjects=db.subjects;
  const rowTotal=sub=>stages.reduce((n,g)=>n+loadFor(g.id,sub.id),0);
  const stageTotal=g=>subjects.reduce((n,sub)=>n+loadFor(g.id,sub.id),0);
- $('#workspace').innerHTML=`<h2>عدد حصص المواد حسب المرحلة</h2><div class="notice">أدخل العدد الأسبوعي مرة واحدة لكل مادة ومرحلة. الرقم صفر يعني أن المادة غير مقررة لهذه المرحلة. يمكن تخصيص عدد مختلف عند التكليف.</div><div class="tt-wrap"><table class="load-matrix" id="stageLoadMatrix"><thead><tr><th>المادة</th>${stages.map(g=>`<th style="border-top:5px solid ${g.color}">${esc(g.name)}</th>`).join('')}<th>مجموع المادة</th></tr></thead><tbody>${subjects.map(sub=>`<tr><th>${esc(sub.name)}</th>${stages.map(g=>`<td><input type="number" min="0" max="20" data-load="${g.id}|${sub.id}" value="${loadFor(g.id,sub.id)}"></td>`).join('')}<td class="load-total" data-subject-total="${sub.id}">${rowTotal(sub)}</td></tr>`).join('')}<tr class="load-totals-row"><th>مجموع الحصص الأسبوعية لكل مرحلة</th>${stages.map(g=>`<th data-stage-total="${g.id}">${stageTotal(g)}</th>`).join('')}<th data-load-grand-total>${stages.reduce((n,g)=>n+stageTotal(g),0)}</th></tr></tbody></table></div><div class="notice">مجموع كل مرحلة يمثل نصاب شعبة واحدة وفق خطة المواد، ولا يُضرب بعدد الشعب. مجموع المادة يجمع قيمها عبر المراحل للمقارنة فقط.</div><div class="actions"><button id="saveLoads">حفظ خطة الحصص</button></div>`;
+ $('#workspace').innerHTML=`<h2>عدد حصص المواد حسب المرحلة</h2><div class="notice">أدخل العدد الأسبوعي لكل مادة ومرحلة. عند الحفظ تُطابَق تكليفات الشعب مع الخطة، حتى لو كانت الخطة محفوظة سابقاً. الرقم صفر يعني أن المادة غير مقررة لهذه المرحلة.</div><div class="tt-wrap"><table class="load-matrix" id="stageLoadMatrix"><thead><tr><th>المادة</th>${stages.map(g=>`<th style="border-top:5px solid ${g.color}">${esc(g.name)}</th>`).join('')}<th>مجموع المادة</th></tr></thead><tbody>${subjects.map(sub=>`<tr><th>${esc(sub.name)}</th>${stages.map(g=>`<td><input type="number" min="0" max="20" data-load="${g.id}|${sub.id}" value="${loadFor(g.id,sub.id)}"></td>`).join('')}<td class="load-total" data-subject-total="${sub.id}">${rowTotal(sub)}</td></tr>`).join('')}<tr class="load-totals-row"><th>مجموع الحصص الأسبوعية لكل مرحلة</th>${stages.map(g=>`<th data-stage-total="${g.id}">${stageTotal(g)}</th>`).join('')}<th data-load-grand-total>${stages.reduce((n,g)=>n+stageTotal(g),0)}</th></tr></tbody></table></div><div class="notice">مجموع كل مرحلة يمثل نصاب شعبة واحدة وفق خطة المواد، ولا يُضرب بعدد الشعب. مجموع المادة يجمع قيمها عبر المراحل للمقارنة فقط.</div><div class="actions"><button id="saveLoads">حفظ خطة الحصص</button></div>`;
  const inputs=[...document.querySelectorAll('#stageLoadMatrix [data-load]')];
  const numberOf=i=>Math.max(0,Math.min(20,Number(i.value)||0));
  const updateTotals=()=>{
@@ -339,8 +339,16 @@ function loads(){
  inputs.forEach(i=>i.addEventListener('input',updateTotals));
  $('#saveLoads').onclick=()=>{
   const next={...db.stageLoads};inputs.forEach(i=>next[i.dataset.load]=numberOf(i));
-  const changed=inputs.filter(i=>numberOf(i)!==loadFor(...i.dataset.load.split('|')));
-  if(!changed.length){alert('لا توجد تغييرات في خطة الحصص.');return}
+  // Reconcile saved stage quotas with existing assignments even when the quota
+  // was already saved in an earlier version (legacy inconsistent state).
+  const changed=inputs.filter(i=>{
+   const [stageId,subjectId]=i.dataset.load.split('|'),quota=numberOf(i);
+   if(quota!==loadFor(stageId,subjectId))return true;
+   return db.sections.some(sec=>sec.stageId===stageId&&(
+    db.assignments.filter(a=>a.sectionId===sec.id&&a.subjectId===subjectId)
+     .reduce((n,a)=>n+(Number(a.weeklyPeriods)||0),0)!==quota));
+  });
+  if(!changed.length){alert('خطة الحصص والتكليفات متطابقة؛ لا توجد تغييرات.');return}
   const proposed=new Map(), problems=[];
   for(const i of changed){const [stageId,subjectId]=i.dataset.load.split('|'),quota=numberOf(i);
    for(const sec of db.sections.filter(x=>x.stageId===stageId)){
